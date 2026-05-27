@@ -102,6 +102,9 @@ const CSS=`
   .title-inline{background:transparent;border:none;border-bottom:1px solid transparent;color:#e8e8f2;font-size:15px;font-weight:600;padding:4px 0;width:100%;font-family:inherit;transition:border-color 0.15s;}
   .title-inline:focus{outline:none;border-bottom-color:#534AB7;}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .chk{width:16px;height:16px;accent-color:#9D95E8;cursor:pointer;flex-shrink:0;margin-right:2px;}
+  .bulk-bar{position:sticky;top:0;z-index:20;background:#1c1838;border:0.5px solid #3d3780;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .bulk-cnt{font-size:13px;color:#9D95E8;font-weight:600;flex:1;}
 `;
 
 function PageHeader({title,sub,btn,extra}){
@@ -233,6 +236,10 @@ export default function App(){
   const [syncMsg,setSyncMsg]=useState(null);
   const [moveModal,setMoveModal]=useState(null);
   const [moveTarget,setMoveTarget]=useState({area:"neuro",folder_id:""});
+  const [selectedTopics,setSelectedTopics]=useState(()=>new Set());
+  const [bulkMode,setBulkMode]=useState(false);
+  const [bulkMoveModal,setBulkMoveModal]=useState(false);
+  const [bulkMoveTarget,setBulkMoveTarget]=useState({area:"neuro",folder_id:""});
   const [folderModal,setFolderModal]=useState(null);
   const [folderModalName,setFolderModalName]=useState("");
   const [nt,setNt]=useState({title:"",notes:"",tags:"",area:"neuro",folder_id:""});
@@ -267,7 +274,7 @@ export default function App(){
           sb.from('study_logs').select('*').order('log_date',{ascending:false}).limit(90),
           sb.from('knowledge').select('*').order('updated_at',{ascending:false}),
         ]);
-        const mi=(l,r)=>{const m=new Map();l.forEach(x=>m.set(String(x.id),x));r.forEach(x=>m.set(String(x.id),x));return[...m.values()];};
+        const mi=(l,r)=>{const m=new Map();l.forEach(x=>m.set(String(x.id),x));r.forEach(x=>{const ex=m.get(String(x.id));if(!ex||(x.updated_at&&(!ex.updated_at||x.updated_at>ex.updated_at)))m.set(String(x.id),x);});return[...m.values()];};
         if(t.data?.length>0){setTopics(p=>{const m=mi(p,t.data);LS.set("topics",m);return m;});}
         if(r.data?.length>0){setRevRows(p=>{const m=mi(p,r.data);LS.set("revRows",m);return m;});}
         if(b.data?.length>0){setBooks(b.data);LS.set("books",b.data);}
@@ -307,16 +314,18 @@ export default function App(){
     if(edits.notes!==undefined)changes.notes=edits.notes;
     if(edits.tags!==undefined)changes.tags=edits.tags.split(",").map(t=>t.trim()).filter(Boolean);
     if(!Object.keys(changes).length)return;
-    setTopics(p=>p.map(t=>t.id===id?{...t,...changes}:t));
-    try{await sb.from('topics').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);}catch{}
+    const ts=new Date().toISOString();
+    setTopics(p=>p.map(t=>t.id===id?{...t,...changes,updated_at:ts}:t));
+    try{await sb.from('topics').update({...changes,updated_at:ts}).eq('id',id);}catch{}
   },[editNotes]);
 
   const moveTopic=useCallback(async()=>{
     if(!moveModal)return;
-    const changes={area:moveTarget.area,folder_id:moveTarget.folder_id||null};
+    const ts=new Date().toISOString();
+    const changes={area:moveTarget.area,folder_id:moveTarget.folder_id||null,updated_at:ts};
     setTopics(p=>p.map(t=>t.id===moveModal.topicId?{...t,...changes}:t));
     setMoveModal(null);
-    try{await sb.from('topics').update({...changes,updated_at:new Date().toISOString()}).eq('id',moveModal.topicId);}catch{}
+    try{await sb.from('topics').update(changes).eq('id',moveModal.topicId);}catch{}
   },[moveModal,moveTarget]);
 
   const reviewTopic=useCallback(async(id,qual)=>{
@@ -325,13 +334,38 @@ export default function App(){
     const interval=topic.repetitions===0?1:topic.repetitions===1?6:Math.round((topic.interval_days||1)*ef);
     const next=Date.now()+interval*864e5;
     const updated={...topic,repetitions:(topic.repetitions||0)+1,interval_days:interval,next_review:next,ef};
-    setTopics(p=>p.map(t=>t.id===id?updated:t));
-    try{await sb.from('topics').update({repetitions:updated.repetitions,interval_days:interval,next_review:next,ef,updated_at:new Date().toISOString()}).eq('id',id);}catch{}
+    const ts=new Date().toISOString();
+    setTopics(p=>p.map(t=>t.id===id?{...updated,updated_at:ts}:t));
+    try{await sb.from('topics').update({repetitions:updated.repetitions,interval_days:interval,next_review:next,ef,updated_at:ts}).eq('id',id);}catch{}
   },[topics]);
 
   const createFolder=(area,name)=>{if(!name.trim())return;const id="f"+Date.now();setFolders(p=>({...p,[area]:[...(p[area]||[]),{id,name:name.trim()}]}));};
   const renameFolder=(area,fid,name)=>{if(!name.trim())return;setFolders(p=>({...p,[area]:(p[area]||[]).map(f=>f.id===fid?{...f,name:name.trim()}:f)}));};
   const deleteFolder=(area,fid)=>{if(!confirm("Excluir pasta? Tópicos ficarão sem pasta."))return;setFolders(p=>({...p,[area]:(p[area]||[]).filter(f=>f.id!==fid)}));setTopics(p=>p.map(t=>t.area===area&&t.folder_id===fid?{...t,folder_id:null}:t));};
+
+  const toggleSelectTopic=(id)=>setSelectedTopics(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  const selectAllInGroup=(ids)=>setSelectedTopics(p=>{const n=new Set(p);ids.forEach(id=>n.add(id));return n;});
+  const deselectAllInGroup=(ids)=>setSelectedTopics(p=>{const n=new Set(p);ids.forEach(id=>n.delete(id));return n;});
+  const clearSelection=()=>{setSelectedTopics(new Set());setBulkMode(false);};
+
+  const bulkDelete=async()=>{
+    if(!selectedTopics.size)return;
+    if(!confirm(`Excluir ${selectedTopics.size} tópico(s) selecionado(s)?`))return;
+    const ids=[...selectedTopics];
+    setTopics(p=>p.filter(t=>!ids.includes(t.id)));
+    setSelectedTopics(new Set());
+    try{for(const id of ids)await sb.from('topics').delete().eq('id',id);}catch{}
+  };
+
+  const bulkMove=async()=>{
+    if(!selectedTopics.size)return;
+    const ids=[...selectedTopics];
+    const ts=new Date().toISOString();
+    const changes={area:bulkMoveTarget.area,folder_id:bulkMoveTarget.folder_id||null,updated_at:ts};
+    setTopics(p=>p.map(t=>ids.includes(t.id)?{...t,...changes}:t));
+    setSelectedTopics(new Set());setBulkMoveModal(false);
+    try{for(const id of ids)await sb.from('topics').update(changes).eq('id',id);}catch{}
+  };;
 
   const toggleXlCheck=useCallback(async(rowId,idx)=>{
     const row=revRows.find(r=>r.id===rowId);if(!row)return;
@@ -424,9 +458,10 @@ export default function App(){
     const ed=editNotes[t.id]||{};
     return(
       <div style={{background:exp?"#12121a":C.card,border:`0.5px solid ${exp?area.color:C.bord}`,borderRadius:9,overflow:"hidden",marginBottom:3}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",cursor:"pointer"}} onClick={()=>setExpanded(exp?null:t.id)}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",cursor:"pointer"}} onClick={()=>!bulkMode&&setExpanded(exp?null:t.id)}>
           <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
-            <i className={`ti ${exp?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:13,color:C.muted,flexShrink:0}} aria-hidden/>
+            {bulkMode&&<input type="checkbox" className="chk" checked={selectedTopics.has(t.id)} onChange={()=>toggleSelectTopic(t.id)} onClick={e=>e.stopPropagation()}/>}
+            <i className={`ti ${exp&&!bulkMode?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:13,color:C.muted,flexShrink:0}} aria-hidden/>
             <span style={{fontWeight:500,fontSize:13,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:exp?"normal":"nowrap"}}>{ed.title??t.title}</span>
             {isDue&&<span className="bdg" style={{background:"#2d1010",color:"#fca5a5",flexShrink:0}}>Revisar!</span>}
             {!isDue&&days!==null&&days<=3&&days>=0&&<span className="bdg" style={{background:"#2d2010",color:"#fde68a",flexShrink:0}}>Em {days}d</span>}
@@ -500,6 +535,7 @@ export default function App(){
           }
           <span style={{fontSize:11,color:C.muted,flexShrink:0}}>{fTopics.length}</span>
           <div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
+            {bulkMode&&(()=>{const allIds=fTopics.map(t=>t.id);const allSel=allIds.length>0&&allIds.every(id=>selectedTopics.has(id));return(<button className="btn btn-sm" title={allSel?"Desmarcar todos":"Selecionar todos"} onClick={()=>allSel?deselectAllInGroup(allIds):selectAllInGroup(allIds)}><i className={`ti ${allSel?"ti-square-minus":"ti-checkbox"}`} aria-hidden/></button>);})()}
             <button className="btn btn-sm" title="Renomear" onClick={()=>{setRenaming(true);setRenameVal(folder.name);}}><i className="ti ti-pencil" aria-hidden/></button>
             <button className="btn btn-sm btnr" title="Excluir pasta" onClick={()=>deleteFolder(area.id,folder.id)}><i className="ti ti-trash" aria-hidden/></button>
           </div>
@@ -606,7 +642,26 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
               <PageHeader title="Organização" sub={`${topics.length} tópicos · ${Object.values(folders).flat().length} pastas`}
                 btn={{label:"Novo tópico",icon:"ti-plus",fn:()=>setModal("topic")}}
-                extra={unlinked.length>0&&<span style={{fontSize:11,color:"#fde68a",background:"#2d2010",padding:"3px 9px",borderRadius:20}}>{unlinked.length} sem revisão</span>}/>
+                extra={<>
+                  {unlinked.length>0&&<span style={{fontSize:11,color:"#fde68a",background:"#2d2010",padding:"3px 9px",borderRadius:20}}>{unlinked.length} sem revisão</span>}
+                  <button className={`btn btn-sm${bulkMode?" btnp":""}`} onClick={()=>{if(bulkMode)clearSelection();else setBulkMode(true);}}>
+                    <i className={`ti ${bulkMode?"ti-x":"ti-checklist"}`} aria-hidden/>{bulkMode?"Cancelar seleção":"Selecionar vários"}
+                  </button>
+                </>}/>
+              {bulkMode&&selectedTopics.size>0&&(
+                <div className="bulk-bar">
+                  <span className="bulk-cnt"><i className="ti ti-checklist" style={{marginRight:5}}/>{selectedTopics.size} selecionado(s)</span>
+                  <button className="btn btn-sm btng" onClick={()=>{setBulkMoveTarget({area:"neuro",folder_id:""});setBulkMoveModal(true);}}>
+                    <i className="ti ti-arrows-move" aria-hidden/>Mover todos
+                  </button>
+                  <button className="btn btn-sm btnr" onClick={bulkDelete}>
+                    <i className="ti ti-trash" aria-hidden/>Excluir todos
+                  </button>
+                  <button className="btn btn-sm" onClick={()=>setSelectedTopics(new Set())}>
+                    <i className="ti ti-square" aria-hidden/>Limpar seleção
+                  </button>
+                </div>
+              )}
               <div style={{display:"flex",gap:6,marginBottom:4}}>
                 <button className={`atab${orgTab==="topics"?" on":""}`} style={orgTab==="topics"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setOrgTab("topics")}><i className="ti ti-folders" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
                 <button className={`atab${orgTab==="knowledge"?" on":""}`} style={orgTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#34C98A"}:{}} onClick={()=>setOrgTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
@@ -1112,6 +1167,34 @@ export default function App(){
             </ModalWrap>
           );
         })()}
+
+        {bulkMoveModal&&(
+          <ModalWrap title={`Mover ${selectedTopics.size} tópico(s) selecionado(s)`} onClose={()=>setBulkMoveModal(false)}>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{fontSize:12,color:C.muted}}>Área de destino</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {AREAS.map(a=>(
+                  <button key={a.id} className={`atab${bulkMoveTarget.area===a.id?" on":""}`}
+                    style={bulkMoveTarget.area===a.id?{background:a.bg,color:a.text,borderColor:a.color}:{}}
+                    onClick={()=>setBulkMoveTarget({area:a.id,folder_id:""})}>
+                    <i className={`ti ${a.icon}`} style={{marginRight:3,fontSize:12}}/>{a.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{fontSize:12,color:C.muted,marginTop:4}}>Pasta de destino (opcional)</div>
+              <select value={bulkMoveTarget.folder_id||""} onChange={e=>setBulkMoveTarget(v=>({...v,folder_id:e.target.value}))}>
+                <option value="">— Sem pasta —</option>
+                {(folders[bulkMoveTarget.area]||[]).map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <div style={{background:C.dim,borderRadius:8,padding:"8px 12px",fontSize:12,color:C.muted}}>
+                {selectedTopics.size} tópico(s) → <strong style={{color:C.text}}>{AREAS.find(a=>a.id===bulkMoveTarget.area)?.label}{bulkMoveTarget.folder_id?" / "+(folders[bulkMoveTarget.area]||[]).find(f=>f.id===bulkMoveTarget.folder_id)?.name:""}</strong>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btng" style={{flex:1}} onClick={bulkMove}><i className="ti ti-arrows-move" aria-hidden/>Confirmar mover</button>
+                <button className="btn" style={{flex:1}} onClick={()=>setBulkMoveModal(false)}>Cancelar</button>
+              </div>
+            </div>
+          </ModalWrap>)}
 
         {/* ── FOLDER CREATE/RENAME MODAL ── */}
         {folderModal&&(
