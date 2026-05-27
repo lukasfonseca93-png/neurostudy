@@ -271,6 +271,7 @@ export default function App(){
   const [weekStudy,setWeekStudy]=useState(()=>LS.get("weekStudy",{neuro:0,biblia:0,ingles:0,livros:0,geral:0}));
   const [weeklySchedule,setWeeklySchedule]=useState(()=>LS.get("weeklySchedule",{}));
   const [plannerTab,setPlannerTab]=useState("weekly");
+  const [wInputs,setWInputs]=useState({});
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
@@ -1266,7 +1267,6 @@ export default function App(){
           const clearWeek=()=>{if(confirm("Limpar toda a semana?"))setWeeklySchedule({});};
           const todayDow=new Date().getDay();
           const activeDayIdx=todayDow===0?6:todayDow-1;
-          const [wInputs,setWInputs]=useState({});
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Planner" sub="Organização semanal e Kanban por área"/>
