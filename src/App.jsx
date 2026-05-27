@@ -122,7 +122,7 @@ const CSS=`
   .qo:hover:not(:disabled){border-color:#534AB7;background:#1a1a30;}.qo:disabled{cursor:default;}
   .qo.ok{background:#0d2218;border-color:#1D9E75;color:#34C98A;}.qo.no{background:#2d1010;border-color:#7f2020;color:#F87171;}
   .pc{background:#12121a;border:0.5px solid #2a2a38;border-radius:11px;padding:11px;min-width:215px;max-width:255px;flex-shrink:0;}
-  .pcard{background:#1e1e28;border:0.5px solid #2a2a38;border-radius:7px;padding:10px 12px;font-size:13px;cursor:grab;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;line-height:1.5;}
+  .pcard{background:#1e1e28;border:0.5px solid #2a2a38;border-radius:7px;padding:10px 12px;font-size:13px;cursor:grab;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;line-height:1.5;overflow:hidden;min-width:0;}
   .atab{padding:7px 14px;border-radius:7px;border:0.5px solid #2a2a38;background:#12121a;color:#6b6b85;cursor:pointer;font-size:13px;transition:all 0.15s;}.atab.on{font-weight:500;}
   table{border-collapse:collapse;width:100%;}th,td{padding:9px 11px;font-size:13px;}
   th{color:#6b6b85;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;background:#12121a;border-bottom:0.5px solid #2a2a38;}
@@ -1312,7 +1312,7 @@ export default function App(){
                     <span style={{fontSize:13,color:C.muted}}>Semana atual — organize o que vai estudar e marque o que concluiu</span>
                     <button className="btn btn-sm btnr" onClick={clearWeek}><i className="ti ti-trash" aria-hidden/>Limpar semana</button>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8,overflowX:"auto"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(120px,1fr))",gap:8,overflowX:"auto"}}>
                     {WEEK_DAYS.map((day,idx)=>{
                       const key=WEEK_KEYS[idx];
                       const items=weeklySchedule[key]||[];
@@ -1327,7 +1327,7 @@ export default function App(){
                           {items.map(item=>(
                             <div key={item.id} style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:5,opacity:item.done?0.5:1}}>
                               <input type="checkbox" checked={item.done} onChange={()=>toggleWeekItem(key,item.id)} style={{marginTop:2,accentColor:"#9D95E8",flexShrink:0}}/>
-                              <span style={{fontSize:12,flex:1,lineHeight:1.5,textDecoration:item.done?"line-through":"none",color:item.done?C.muted:C.text,wordBreak:"break-word"}}>{item.text}</span>
+                              <span style={{fontSize:12,flex:1,minWidth:0,lineHeight:1.5,textDecoration:item.done?"line-through":"none",color:item.done?C.muted:C.text,wordBreak:"break-word",overflowWrap:"break-word"}}>{item.text}</span>
                               <button onClick={()=>delWeekItem(key,item.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,flexShrink:0,lineHeight:1}}>×</button>
                             </div>
                           ))}
@@ -1354,7 +1354,7 @@ export default function App(){
                       </div>
                       {col.cards.map(card=>(
                         <div key={card.id} className="pcard" style={{marginBottom:5}}>
-                          <span style={{flex:1,lineHeight:1.5,fontSize:13}}>{card.text}</span>
+                          <span style={{flex:1,minWidth:0,lineHeight:1.5,fontSize:13,wordBreak:"break-word",overflowWrap:"break-word"}}>{card.text}</span>
                           <button onClick={()=>delPlannerCard(col.id,card.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>
                         </div>
                       ))}
