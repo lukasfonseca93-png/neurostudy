@@ -307,10 +307,10 @@ export default function App(){
     try{await sb.from('topics').delete().eq('id',id);}catch{}
   },[]);
 
-  const saveTopicEdits=useCallback(async(id)=>{
-    const edits=editNotes[id];if(!edits)return;
+  const saveTopicEdits=useCallback(async(id,directEdits)=>{
+    const edits=directEdits||editNotes[id];if(!edits)return;
     const changes={};
-    if(edits.title!==undefined)changes.title=edits.title;
+    if(edits.title!==undefined)changes.title=edits.title.trim()||edits.title;
     if(edits.notes!==undefined)changes.notes=edits.notes;
     if(edits.tags!==undefined)changes.tags=edits.tags.split(",").map(t=>t.trim()).filter(Boolean);
     if(!Object.keys(changes).length)return;
@@ -462,7 +462,7 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
             {bulkMode&&<input type="checkbox" className="chk" checked={selectedTopics.has(t.id)} onChange={()=>toggleSelectTopic(t.id)} onClick={e=>e.stopPropagation()}/>}
             <i className={`ti ${exp&&!bulkMode?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:13,color:C.muted,flexShrink:0}} aria-hidden/>
-            <span style={{fontWeight:500,fontSize:13,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:exp?"normal":"nowrap"}}>{ed.title??t.title}</span>
+            <span style={{fontWeight:500,fontSize:13,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:exp?"normal":"nowrap"}}>{t.title}</span>
             {isDue&&<span className="bdg" style={{background:"#2d1010",color:"#fca5a5",flexShrink:0}}>Revisar!</span>}
             {!isDue&&days!==null&&days<=3&&days>=0&&<span className="bdg" style={{background:"#2d2010",color:"#fde68a",flexShrink:0}}>Em {days}d</span>}
             {linkedRev&&<span className="bdg" style={{background:"#1a2840",color:"#93c5fd",flexShrink:0}}>Rev.✓</span>}
@@ -477,18 +477,21 @@ export default function App(){
         </div>
         {exp&&(
           <div style={{padding:"8px 14px 14px",borderTop:`0.5px solid ${C.bord}`}}>
-            <input className="title-inline" value={ed.title??t.title}
-              onChange={e=>setEditNotes(n=>({...n,[t.id]:{...n[t.id],title:e.target.value}}))}
-              onBlur={()=>saveTopicEdits(t.id)} style={{marginBottom:8}}/>
+            <input className="title-inline"
+              key={"ti"+t.id+(t.updated_at||0)}
+              defaultValue={t.title}
+              onBlur={e=>{if(e.target.value!==t.title)saveTopicEdits(t.id,{title:e.target.value});}}
+              style={{marginBottom:8}}/>
             <textarea className="inline-edit"
-              rows={Math.max(4,((ed.notes??t.notes)||"").split("\n").length+1)}
-              value={ed.notes??t.notes??""}
+              key={"ta"+t.id+(t.updated_at||0)}
+              rows={Math.max(4,(t.notes||"").split("\n").length+1)}
+              defaultValue={t.notes??""}
               placeholder="Clique e comece a digitar..."
-              onChange={e=>setEditNotes(n=>({...n,[t.id]:{...n[t.id],notes:e.target.value}}))}
-              onBlur={()=>saveTopicEdits(t.id)}/>
-            <input value={ed.tags!==undefined?ed.tags:(t.tags||[]).join(", ")}
-              onChange={e=>setEditNotes(n=>({...n,[t.id]:{...n[t.id],tags:e.target.value}}))}
-              onBlur={()=>saveTopicEdits(t.id)}
+              onBlur={e=>{if(e.target.value!==(t.notes||""))saveTopicEdits(t.id,{notes:e.target.value});}}/>
+            <input
+              key={"tg"+t.id+(t.updated_at||0)}
+              defaultValue={(t.tags||[]).join(", ")}
+              onBlur={e=>{if(e.target.value!==(t.tags||[]).join(", "))saveTopicEdits(t.id,{tags:e.target.value});}}
               placeholder="Tags separadas por vírgula" style={{fontSize:11,marginTop:6}}/>
             {linkedRev&&(
               <div style={{background:"#1a2840",border:"0.5px solid #2a3850",borderRadius:8,padding:"8px 12px",marginTop:8}}>
