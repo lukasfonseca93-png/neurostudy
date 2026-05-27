@@ -20,11 +20,46 @@ const REV_LABELS = ["+1d","+10d","+30d","+90d","+180d","+360d","+720d","+1440d"]
 const PERIODS = ["semanal","mensal","semestral","anual"];
 
 const DEFAULT_FOLDERS = {
-  neuro:  [{id:"nf1",name:"História e Conceitos Gerais"},{id:"nf2",name:"Lobos e Córtex"},{id:"nf3",name:"Neurotransmissores e Sinapses"},{id:"nf4",name:"Memória e Aprendizado"},{id:"nf5",name:"Emoções e Comportamento"},{id:"nf6",name:"Módulos IPOG / VRC"}],
-  biblia: [{id:"bf1",name:"Evangelhos Sinóticos"},{id:"bf2",name:"Evangelho de João"},{id:"bf3",name:"Cartas e Epístolas"},{id:"bf4",name:"Antigo Testamento"},{id:"bf5",name:"Módulos IPOG"}],
-  ingles: [{id:"if1",name:"Gramática"},{id:"if2",name:"Vocabulário e Expressões"},{id:"if3",name:"Homework"},{id:"if4",name:"Lições Poliglota"}],
-  livros: [{id:"lf1",name:"Neurociências e Mente"},{id:"lf2",name:"Desenvolvimento Pessoal"},{id:"lf3",name:"Filosofia e Estoicismo"},{id:"lf4",name:"Liderança e Comunicação"},{id:"lf5",name:"Outros"}],
-  geral:  [{id:"gf1",name:"Filosofia"},{id:"gf2",name:"Liderança e Comunicação"},{id:"gf3",name:"Psicologia e Comportamento"},{id:"gf4",name:"Outros"}],
+  neuro:  [
+    {id:"nf1",name:"Neuroanatomia e Estruturas"},
+    {id:"nf2",name:"Córtex Pré-Frontal e Lobos"},
+    {id:"nf3",name:"Neurotransmissores e Sinapses"},
+    {id:"nf4",name:"Memória e Aprendizado"},
+    {id:"nf5",name:"Emoções e Sistema Límbico"},
+    {id:"nf6",name:"Módulos IPOG / VRC"},
+    {id:"nf7",name:"Neurociência Comportamental"},
+    {id:"nf8",name:"Podcasts Neuro"},
+  ],
+  biblia: [
+    {id:"bf1",name:"Vida e Ministério de Jesus"},
+    {id:"bf2",name:"Evangelho de João"},
+    {id:"bf3",name:"Cartas e Epístolas"},
+    {id:"bf4",name:"Antigo Testamento"},
+    {id:"bf5",name:"Módulos IPOG"},
+  ],
+  ingles: [
+    {id:"if1",name:"Gramática"},
+    {id:"if2",name:"Vocabulário e Expressões"},
+    {id:"if3",name:"Homework"},
+    {id:"if4",name:"Lições Poliglota"},
+    {id:"if5",name:"Francês"},
+  ],
+  livros: [
+    {id:"lf1",name:"Neurociências e Mente"},
+    {id:"lf2",name:"Desenvolvimento Pessoal"},
+    {id:"lf3",name:"Filosofia e Estoicismo"},
+    {id:"lf4",name:"Liderança e Comunicação"},
+    {id:"lf5",name:"Outros"},
+  ],
+  geral:  [
+    {id:"gf1",name:"Filosofia"},
+    {id:"gf2",name:"Liderança e Comunicação"},
+    {id:"gf3",name:"Psicologia e Comportamento"},
+    {id:"gf4",name:"Produtividade e Hábitos"},
+    {id:"gf5",name:"Oratória e Apresentações"},
+    {id:"gf6",name:"Princípios Pessoais"},
+    {id:"gf7",name:"Outros"},
+  ],
 };
 
 const LS = {
