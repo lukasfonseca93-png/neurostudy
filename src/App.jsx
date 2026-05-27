@@ -1147,12 +1147,8 @@ export default function App(){
                         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,background:"#0f0f13"}}>
                           {[
                             {k:"resumo",l:"📋 Resumo",icon:"ti-notes",color:"#9D95E8",ph:"O que este capítulo aborda? Principais conceitos..."},
-                            {k:"perguntas",l:"❓ Perguntas-chave",icon:"ti-help-circle",color:"#60A5FA",ph:"• Que problema o autor resolve?
-• Quais são as principais ideias?
-• Como isso se aplica na prática?"},
-                            {k:"insights",l:"💡 Insights & Aplicações",icon:"ti-bulb",color:"#FBBF24",ph:"• Insight 1: ...
-• Aplicação: ...
-• Conexão com outros conceitos: ..."}
+                            {k:"perguntas",l:"❓ Perguntas-chave",icon:"ti-help-circle",color:"#60A5FA",ph:"• Que problema o autor resolve?\n• Quais são as principais ideias?\n• Como isso se aplica na prática?"},
+                            {k:"insights",l:"💡 Insights & Aplicações",icon:"ti-bulb",color:"#FBBF24",ph:"• Insight 1: ...\n• Aplicação: ...\n• Conexão com outros conceitos: ..."}
                           ].map(f=>(
                             <div key={f.k} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
                               <div style={{fontSize:12,color:f.color,fontWeight:600,marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
