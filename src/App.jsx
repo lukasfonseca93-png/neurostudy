@@ -303,15 +303,24 @@ export default function App(){
   const [ng,setNg]=useState({area:"neuro",title:"",target:"",unit:"",period:"anual"});
   const [nr,setNr]=useState({topic:"",cat:"Neuro",base_date:today()});
   const t0=today();
+  const settingsTimer=useRef(null);
 
   useEffect(()=>{if(loaded)LS.set("topics",topics);},[topics,loaded]);
-  useEffect(()=>{if(loaded)LS.set("folders",folders);},[folders,loaded]);
+  useEffect(()=>{
+    if(!loaded)return;
+    LS.set("folders",folders);
+    saveSettings(folders,weekStudy);
+  },[folders,loaded]);
   useEffect(()=>{if(loaded)LS.set("revRows",revRows);},[revRows,loaded]);
   useEffect(()=>{if(loaded)LS.set("books",books);},[books,loaded]);
   useEffect(()=>{if(loaded)LS.set("goals",goals);},[goals,loaded]);
   useEffect(()=>{if(loaded)LS.set("knowledge",knowledge);},[knowledge,loaded]);
   useEffect(()=>{if(loaded)LS.set("planner",planner);},[planner,loaded]);
-  useEffect(()=>{if(loaded)LS.set("weekStudy",weekStudy);},[weekStudy,loaded]);
+  useEffect(()=>{
+    if(!loaded)return;
+    LS.set("weekStudy",weekStudy);
+    saveSettings(folders,weekStudy);
+  },[weekStudy,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
@@ -329,13 +338,15 @@ export default function App(){
     setLoaded(true);
     (async()=>{
       try{
-        const [t,r,b,g,sl,k]=await Promise.all([
+        const [t,r,b,g,sl,k,st,pl]=await Promise.all([
           sb.from('topics').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
           sb.from('rev_rows').select('*').eq('user_id',session.user.id).order('base_date',{ascending:false}),
           sb.from('books').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
           sb.from('goals').select('*').eq('user_id',session.user.id),
           sb.from('study_logs').select('*').order('log_date',{ascending:false}).limit(90),
           sb.from('knowledge').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
+          sb.from('user_settings').select('*').eq('user_id',session.user.id).single(),
+          sb.from('planner').select('*').eq('user_id',session.user.id),
         ]);
         const mi=(l,r)=>{const m=new Map();l.forEach(x=>m.set(String(x.id),x));r.forEach(x=>{const ex=m.get(String(x.id));if(!ex||(x.updated_at&&(!ex.updated_at||x.updated_at>ex.updated_at)))m.set(String(x.id),x);});return[...m.values()];};
         if(t.data?.length>0){setTopics(p=>{const m=mi(p,t.data);LS.set("topics",m);return m;});}
@@ -343,6 +354,14 @@ export default function App(){
         if(b.data?.length>0){setBooks(b.data);LS.set("books",b.data);}
         if(g.data?.length>0){setGoals(g.data);LS.set("goals",g.data);}
         if(k.data?.length>0){setKnowledge(k.data);LS.set("knowledge",k.data);}
+        if(st.data){
+          if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
+          if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
+        }
+        if(pl.data?.length>0){
+          const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
+          setPlanner(pm);LS.set("planner",pm);
+        }
         setSyncMsg("☁️ Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
       }catch{}
     })();
@@ -430,6 +449,19 @@ export default function App(){
     try{for(const id of ids)await sb.from('topics').update(changes).eq('id',id);}catch{}
   };;
 
+  const saveSettings=useCallback(async(newFolders,newWeekStudy)=>{
+    if(!session?.user?.id)return;
+    clearTimeout(settingsTimer.current);
+    settingsTimer.current=setTimeout(async()=>{
+      try{await sb.from('user_settings').upsert({
+        user_id:session.user.id,
+        folders:newFolders,
+        week_study:newWeekStudy,
+        updated_at:new Date().toISOString()
+      },{onConflict:'user_id'});}catch{}
+    },1500);
+  },[session]);
+
   const toggleXlCheck=useCallback(async(rowId,idx)=>{
     const row=revRows.find(r=>r.id===rowId);if(!row)return;
     const ch=[...(row.checks||[0,0,0,0,0,0,0,0])];ch[idx]=ch[idx]?0:1;
@@ -472,7 +504,7 @@ export default function App(){
   const addGoalNote=useCallback(async(gId)=>{const txt=(goalNotes[gId]||"").trim();if(!txt)return;const goal=goals.find(g=>g.id===gId);if(!goal)return;const history=[...(goal.history||[]),{date:t0,text:txt}];setGoals(p=>p.map(g=>g.id===gId?{...g,history}:g));setGoalNotes(n=>({...n,[gId]:""}));try{await sb.from('goals').update({history,updated_at:new Date().toISOString()}).eq('id',gId);}catch{}},[goals,goalNotes,t0]);
 
   const pd=planner[aArea]||[];
-  const savePlanner=useCallback(async(area,cols)=>{setPlanner(p=>({...p,[area]:cols}));try{await sb.from('planner').upsert({area,cols,updated_at:new Date().toISOString()});}catch{}},[]);
+  const savePlanner=useCallback(async(area,cols)=>{setPlanner(p=>({...p,[area]:cols}));try{await sb.from('planner').upsert({area,cols,user_id:session?.user?.id||null,updated_at:new Date().toISOString()},{onConflict:'area,user_id'});}catch{}},[session]);
   const addPlannerCol=()=>{if(!colTxt.trim())return;savePlanner(aArea,[...pd,{id:Date.now(),title:colTxt,cards:[]}]);setColTxt("");setAddCol(false);};
   const addPlannerCard=(colId,txt)=>{if(!txt.trim())return;savePlanner(aArea,pd.map(c=>c.id===colId?{...c,cards:[...c.cards,{id:Date.now(),text:txt}]}:c));setAddCard(null);setCardTxt({});};
   const delPlannerCard=(colId,cardId)=>savePlanner(aArea,pd.map(c=>c.id===colId?{...c,cards:c.cards.filter(x=>x.id!==cardId)}:c));
