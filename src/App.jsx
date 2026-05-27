@@ -515,9 +515,10 @@ export default function App(){
     setQLoad(true);setQErr(null);
     try{
       const notes=item.notes||item.content||"";
-      const resp=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer PLACEHOLDER"},body:JSON.stringify({model:"gpt-3.5-turbo",temperature:0.7,messages:[{role:"system",content:"Crie 5 perguntas de múltipla escolha em português. Responda APENAS com JSON: [{\"q\":\"...\",\"opts\":[\"A...\",...],\"ans\":0},...]."},{role:"user",content:notes.slice(0,3000)}]})});
-      const d=await resp.json();const raw=d.choices?.[0]?.message?.content||"[]";
-      const questions=JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0]||"[]");
+      const resp=await fetch("/api/quiz",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({notes,title:item.title})});
+      const d=await resp.json();
+      if(!resp.ok)throw new Error(d.error||"Erro ao gerar quiz");
+      const questions=d.questions||[];
       if(!questions.length)throw new Error("Sem perguntas geradas");
       if(!item.isKnowledge)setTopics(p=>p.map(t=>t.id===item.id?{...t,quiz_cache:questions}:t));
       setQuiz({questions,idx:0,score:0,sel:null,topicTitle:item.title,topicId:item.id,isKnowledge:!!item.isKnowledge});
