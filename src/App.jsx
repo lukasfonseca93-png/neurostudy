@@ -511,7 +511,7 @@ export default function App(){
   const delPlannerCol=(colId)=>{if(!confirm("Excluir coluna?"))return;savePlanner(aArea,pd.filter(c=>c.id!==colId));};
 
   const genQuiz=useCallback(async(item,force=false)=>{
-    if(!force&&item.quiz_cache){setQuiz({questions:item.quiz_cache,idx:0,score:0,sel:null,topicTitle:item.title,topicId:item.id,isKnowledge:false});return;}
+    // sempre gera novo quiz — não usa cache para garantir respostas embaralhadas
     setQLoad(true);setQErr(null);
     try{
       const notes=item.notes||item.content||"";
@@ -520,7 +520,7 @@ export default function App(){
       if(!resp.ok)throw new Error(d.error||"Erro ao gerar quiz");
       const questions=d.questions||[];
       if(!questions.length)throw new Error("Sem perguntas geradas");
-      if(!item.isKnowledge)setTopics(p=>p.map(t=>t.id===item.id?{...t,quiz_cache:questions}:t));
+      // não salva cache — cada quiz é gerado fresco com respostas embaralhadas
       setQuiz({questions,idx:0,score:0,sel:null,topicTitle:item.title,topicId:item.id,isKnowledge:!!item.isKnowledge});
     }catch(e){setQErr("Erro ao gerar quiz: "+e.message);}
     finally{setQLoad(false);}
