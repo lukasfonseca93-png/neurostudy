@@ -269,6 +269,8 @@ export default function App(){
   const [planner,setPlanner]=useState(()=>LS.get("planner",{}));
   const [quizHistory,setQuizHistory]=useState(()=>LS.get("quizHistory",[]));
   const [weekStudy,setWeekStudy]=useState(()=>LS.get("weekStudy",{neuro:0,biblia:0,ingles:0,livros:0,geral:0}));
+  const [weeklySchedule,setWeeklySchedule]=useState(()=>LS.get("weeklySchedule",{}));
+  const [plannerTab,setPlannerTab]=useState("weekly");
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
@@ -316,6 +318,7 @@ export default function App(){
   useEffect(()=>{if(loaded)LS.set("goals",goals);},[goals,loaded]);
   useEffect(()=>{if(loaded)LS.set("knowledge",knowledge);},[knowledge,loaded]);
   useEffect(()=>{if(loaded)LS.set("planner",planner);},[planner,loaded]);
+  useEffect(()=>{if(loaded)LS.set("weeklySchedule",weeklySchedule);},[weeklySchedule,loaded]);
   useEffect(()=>{
     if(!loaded)return;
     LS.set("weekStudy",weekStudy);
@@ -439,6 +442,31 @@ export default function App(){
     try{for(const id of ids)await sb.from('topics').delete().eq('id',id);}catch{}
   };
 
+  const [autoOrganizing,setAutoOrganizing]=useState(false);
+  const autoOrganize=async()=>{
+    if(!confirm(`Organizar ${topics.length} tópicos automaticamente com IA? Isso vai atualizar as áreas e pastas de todos os tópicos.`))return;
+    setAutoOrganizing(true);
+    try{
+      const resp=await fetch("/api/organize",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({topics:topics.map(t=>({id:t.id,title:t.title,notes:(t.notes||"").slice(0,200)})),areas:AREAS,folders})});
+      const{assignments}=await resp.json();
+      if(!assignments)throw new Error("Sem resultado");
+      const ts=new Date().toISOString();
+      const updated=topics.map(t=>{
+        const a=assignments[String(t.id)];
+        if(!a)return t;
+        return{...t,area:a.area,folder_id:a.folder_id||null,updated_at:ts};
+      });
+      setTopics(updated);LS.set("topics",updated);
+      for(const t of updated){
+        const a=assignments[String(t.id)];
+        if(a)try{await sb.from('topics').update({area:a.area,folder_id:a.folder_id||null,updated_at:ts}).eq('id',t.id);}catch{}
+      }
+      setSyncMsg("✅ "+Object.keys(assignments).length+" tópicos organizados!");setTimeout(()=>setSyncMsg(null),4000);
+    }catch(e){alert("Erro: "+e.message);}
+    finally{setAutoOrganizing(false);}
+  };
+
   const bulkMove=async()=>{
     if(!selectedTopics.size)return;
     const ids=[...selectedTopics];
@@ -496,6 +524,14 @@ export default function App(){
   const updateChapter=useCallback(async(bId,chId,changes)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,...changes}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
   const deleteChapter=useCallback(async(bId,chId)=>{if(!confirm("Excluir capítulo?"))return;const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).filter(c=>c.id!==chId);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
   const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
+  const addChapterToReview=useCallback(async(book,ch)=>{
+    const id="ch_"+ch.id;if(revRows.find(r=>r.id===id)){alert("Capítulo já está na revisão.");return;}
+    const catLabel=AREAS.find(a=>a.id===book.area)?.label||"Geral";
+    const row={id,topic:book.title+" — "+ch.title,cat:catLabel,base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
+    setRevRows(p=>[...p.filter(r=>r.id!==id),row]);
+    try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
+  },[t0,revRows,session]);
+
   const addBookToReview=useCallback(async(book)=>{const id="book_"+book.id;if(revRows.find(r=>r.id===id)){alert("Livro já está na revisão.");return;}const row={id,topic:book.title+" (Livro)",cat:AREAS.find(a=>a.id===book.area)?.label||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};setRevRows(p=>[...p.filter(r=>r.id!==id),row]);try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}},[t0,revRows]);
 
   const addGoal=useCallback(async()=>{const id=Date.now();const goal={id,area:ng.area,title:ng.title,target:Number(ng.target),done:0,unit:ng.unit,period:ng.period,history:[],user_id:session?.user?.id||null};setGoals(p=>[...p,goal]);setModal(null);setNg({area:"neuro",title:"",target:"",unit:"",period:"anual"});try{await sb.from('goals').upsert({...goal,updated_at:new Date().toISOString()});}catch{}},[ng]);
@@ -759,6 +795,10 @@ export default function App(){
                   {unlinked.length>0&&<span style={{fontSize:11,color:"#fde68a",background:"#2d2010",padding:"3px 9px",borderRadius:20}}>{unlinked.length} sem revisão</span>}
                   <button className={`btn btn-sm${bulkMode?" btnp":""}`} onClick={()=>{if(bulkMode)clearSelection();else setBulkMode(true);}}>
                     <i className={`ti ${bulkMode?"ti-x":"ti-checklist"}`} aria-hidden/>{bulkMode?"Cancelar seleção":"Selecionar vários"}
+                  </button>
+                  <button className="btn btn-sm" disabled={autoOrganizing} onClick={autoOrganize} title="IA organiza todos os tópicos automaticamente">
+                    <i className={`ti ${autoOrganizing?"ti-loader-2":"ti-wand"}`} style={autoOrganizing?{animation:"spin 1s linear infinite"}:{}} aria-hidden/>
+                    {autoOrganizing?"Organizando...":"Auto-organizar"}
                   </button>
                 </>}/>
               {bulkMode&&selectedTopics.size>0&&(
@@ -1076,33 +1116,54 @@ export default function App(){
                 </div>
                 <div className="st" style={{marginTop:8}}>Capítulos — Fichamento SQ4R</div>
                 {(bookData.chapters||[]).length===0&&<p style={{fontSize:13,color:C.muted,marginBottom:8}}>Nenhum capítulo ainda.</p>}
-                {(bookData.chapters||[]).map(ch=>{
+                {(bookData.chapters||[]).map((ch,chIdx)=>{
                   const isExp=editCh===ch.id;
                   const vals={...ch,...(chChanges[ch.id]||{})};
                   const isRenaming=renamingCh===ch.id;
+                  const isChLinked=revRows.find(r=>r.id==="ch_"+ch.id);
+                  const aColor=AREAS.find(a=>a.id===bookData.area)?.color||"#9D95E8";
                   return(
-                    <div key={ch.id} style={{border:`0.5px solid ${C.bord}`,borderRadius:8,marginBottom:6,overflow:"hidden"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",cursor:"pointer",background:isExp?"#1c1838":C.dim}} onClick={()=>!isRenaming&&setEditCh(isExp?null:ch.id)}>
-                        <i className={`ti ${isExp?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:13,color:C.muted,flexShrink:0}} aria-hidden/>
+                    <div key={ch.id} style={{border:`0.5px solid ${isExp?aColor:C.bord}`,borderRadius:10,marginBottom:6,overflow:"hidden"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"11px 14px",cursor:"pointer",background:isExp?"#12121a":C.dim}} onClick={()=>!isRenaming&&setEditCh(isExp?null:ch.id)}>
+                        <span style={{fontSize:11,color:C.muted,fontWeight:600,flexShrink:0,minWidth:22}}>#{chIdx+1}</span>
+                        <i className={`ti ${isExp?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:12,color:C.muted,flexShrink:0}} aria-hidden/>
                         {isRenaming
                           ?<input autoFocus value={renameVal} onChange={e=>setRenameVal(e.target.value)}
                               onKeyDown={e=>{if(e.key==="Enter"&&renameVal.trim()){renameChapter(bookData.id,ch.id,renameVal.trim());setRenamingCh(null);}if(e.key==="Escape")setRenamingCh(null);}}
                               onBlur={()=>{if(renameVal.trim())renameChapter(bookData.id,ch.id,renameVal.trim());setRenamingCh(null);}}
                               onClick={e=>e.stopPropagation()} style={{fontSize:13,padding:"3px 7px",flex:1}}/>
-                          :<span style={{fontWeight:500,fontSize:13,flex:1}}>{ch.title}</span>
+                          :<span style={{fontWeight:600,fontSize:13,flex:1,color:isExp?C.text:"#b0b0c8"}}>{ch.title}</span>
                         }
+                        {isChLinked&&<span className="bdg" style={{background:"#1a2840",color:"#93c5fd",fontSize:10,flexShrink:0}}>Rev ✓</span>}
                         <div style={{display:"flex",gap:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                          {!isChLinked&&<button className="btn btn-sm" title="Adicionar capítulo à revisão espaçada" onClick={()=>addChapterToReview(bookData,ch)}><i className="ti ti-calendar-plus" aria-hidden/></button>}
                           {isExp&&<button className="btn btn-sm btng" onClick={()=>{updateChapter(bookData.id,ch.id,chChanges[ch.id]||{});setEditCh(null);}}><i className="ti ti-device-floppy" aria-hidden/>Salvar</button>}
                           <button className="btn btn-sm" onClick={()=>{setRenamingCh(ch.id);setRenameVal(ch.title);setEditCh(null);}}><i className="ti ti-pencil" aria-hidden/></button>
                           <button className="btn btn-sm btnr" onClick={()=>deleteChapter(bookData.id,ch.id)}><i className="ti ti-trash" aria-hidden/></button>
                         </div>
                       </div>
                       {isExp&&(
-                        <div style={{padding:"12px",display:"flex",flexDirection:"column",gap:10}}>
-                          {[{k:"resumo",l:"Resumo",ph:"O que este capítulo aborda?"},{k:"perguntas",l:"Perguntas-chave",ph:"Que perguntas este capítulo responde?"},{k:"insights",l:"Insights & Aplicações",ph:"O que vai aplicar?"}].map(f=>(
-                            <div key={f.k} style={{background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:8,padding:12}}>
-                              <div style={{fontSize:11,color:"#9D95E8",fontWeight:500,marginBottom:6}}>{f.l}</div>
-                              <textarea rows={3} placeholder={f.ph} value={vals[f.k]||""} onChange={e=>setChChanges(c=>({...c,[ch.id]:{...vals,[f.k]:e.target.value}}))} style={{fontSize:13,resize:"vertical"}}/>
+                        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,background:"#0f0f13"}}>
+                          {[
+                            {k:"resumo",l:"📋 Resumo",icon:"ti-notes",color:"#9D95E8",ph:"O que este capítulo aborda? Principais conceitos..."},
+                            {k:"perguntas",l:"❓ Perguntas-chave",icon:"ti-help-circle",color:"#60A5FA",ph:"• Que problema o autor resolve?
+• Quais são as principais ideias?
+• Como isso se aplica na prática?"},
+                            {k:"insights",l:"💡 Insights & Aplicações",icon:"ti-bulb",color:"#FBBF24",ph:"• Insight 1: ...
+• Aplicação: ...
+• Conexão com outros conceitos: ..."}
+                          ].map(f=>(
+                            <div key={f.k} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
+                              <div style={{fontSize:12,color:f.color,fontWeight:600,marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
+                                <i className={`ti ${f.icon}`}/>{f.l}
+                              </div>
+                              <textarea
+                                key={"ch-"+ch.id+"-"+f.k}
+                                rows={Math.max(3,(vals[f.k]||"").split("\n").length+1)}
+                                placeholder={f.ph}
+                                defaultValue={vals[f.k]||""}
+                                onBlur={e=>setChChanges(c=>({...c,[ch.id]:{...vals,[f.k]:e.target.value}}))}
+                                style={{fontSize:13,resize:"vertical",lineHeight:1.8,background:"transparent",border:"none",padding:0,color:C.text,width:"100%",outline:"none",fontFamily:"inherit"}}/>
                             </div>
                           ))}
                         </div>
@@ -1196,50 +1257,103 @@ export default function App(){
         )}
 
         {/* ── PLANNER ── */}
-        {view==="planner"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
-            <PageHeader title="Planner Kanban" sub="Organize seus estudos por área"/>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {AREAS.map(a=><button key={a.id} className={`atab${aArea===a.id?" on":""}`} style={aArea===a.id?{background:a.bg,color:a.text,borderColor:a.color}:{}} onClick={()=>setAArea(a.id)}><i className={`ti ${a.icon}`} style={{marginRight:3,fontSize:12}}/>{a.label}</button>)}
-            </div>
-            <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,alignItems:"flex-start"}}>
-              {pd.map(col=>(
-                <div key={col.id} className="pc">
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <span style={{fontSize:13,fontWeight:600,color:C.text}}>{col.title}</span>
-                    <button className="btn btn-sm btnr" onClick={()=>delPlannerCol(col.id)}><i className="ti ti-trash" aria-hidden/></button>
+        {view==="planner"&&(()=>{
+          const WEEK_DAYS=["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
+          const WEEK_KEYS=["seg","ter","qua","qui","sex","sab","dom"];
+          const addWeekItem=(dayKey,txt)=>{if(!txt.trim())return;const items=[...(weeklySchedule[dayKey]||[]),{id:Date.now(),text:txt.trim(),done:false,area:""}];setWeeklySchedule(w=>({...w,[dayKey]:items}));};
+          const toggleWeekItem=(dayKey,id)=>setWeeklySchedule(w=>({...w,[dayKey]:(w[dayKey]||[]).map(i=>i.id===id?{...i,done:!i.done}:i)}));
+          const delWeekItem=(dayKey,id)=>setWeeklySchedule(w=>({...w,[dayKey]:(w[dayKey]||[]).filter(i=>i.id!==id)}));
+          const clearWeek=()=>{if(confirm("Limpar toda a semana?"))setWeeklySchedule({});};
+          const todayDow=new Date().getDay();
+          const activeDayIdx=todayDow===0?6:todayDow-1;
+          const [wInputs,setWInputs]=useState({});
+          return(
+            <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+              <PageHeader title="Planner" sub="Organização semanal e Kanban por área"/>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <button className={`atab${plannerTab==="weekly"?" on":""}`} style={plannerTab==="weekly"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setPlannerTab("weekly")}><i className="ti ti-calendar-week" style={{marginRight:4}}/>Weekly Schedule</button>
+                {AREAS.map(a=><button key={a.id} className={`atab${plannerTab===a.id?" on":""}`} style={plannerTab===a.id?{background:a.bg,color:a.text,borderColor:a.color}:{}} onClick={()=>{setPlannerTab(a.id);setAArea(a.id);}}><i className={`ti ${a.icon}`} style={{marginRight:3,fontSize:12}}/>{a.label}</button>)}
+              </div>
+
+              {plannerTab==="weekly"&&(
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                    <span style={{fontSize:13,color:C.muted}}>Semana atual — organize o que vai estudar e marque o que concluiu</span>
+                    <button className="btn btn-sm btnr" onClick={clearWeek}><i className="ti ti-trash" aria-hidden/>Limpar semana</button>
                   </div>
-                  {col.cards.map(card=>(
-                    <div key={card.id} className="pcard" style={{marginBottom:5}}>
-                      <span style={{flex:1,lineHeight:1.5,fontSize:13}}>{card.text}</span>
-                      <button onClick={()=>delPlannerCard(col.id,card.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8,overflowX:"auto"}}>
+                    {WEEK_DAYS.map((day,idx)=>{
+                      const key=WEEK_KEYS[idx];
+                      const items=weeklySchedule[key]||[];
+                      const isToday=idx===activeDayIdx;
+                      const done=items.filter(i=>i.done).length;
+                      return(
+                        <div key={key} style={{background:isToday?"#1c1838":C.surf,border:`0.5px solid ${isToday?"#3d3780":C.bord}`,borderRadius:10,padding:"10px 8px",minWidth:120}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                            <span style={{fontSize:12,fontWeight:700,color:isToday?"#9D95E8":C.text}}>{day}</span>
+                            {items.length>0&&<span style={{fontSize:10,color:done===items.length?"#34C98A":C.muted}}>{done}/{items.length}</span>}
+                          </div>
+                          {items.map(item=>(
+                            <div key={item.id} style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:5,opacity:item.done?0.5:1}}>
+                              <input type="checkbox" checked={item.done} onChange={()=>toggleWeekItem(key,item.id)} style={{marginTop:2,accentColor:"#9D95E8",flexShrink:0}}/>
+                              <span style={{fontSize:12,flex:1,lineHeight:1.5,textDecoration:item.done?"line-through":"none",color:item.done?C.muted:C.text,wordBreak:"break-word"}}>{item.text}</span>
+                              <button onClick={()=>delWeekItem(key,item.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,flexShrink:0,lineHeight:1}}>×</button>
+                            </div>
+                          ))}
+                          <div style={{marginTop:4}}>
+                            <input placeholder="+ adicionar..." value={wInputs[key]||""}
+                              onChange={e=>setWInputs(w=>({...w,[key]:e.target.value}))}
+                              onKeyDown={e=>{if(e.key==="Enter"&&(wInputs[key]||"").trim()){addWeekItem(key,wInputs[key]);setWInputs(w=>({...w,[key]:""}));}}}
+                              style={{fontSize:11,padding:"4px 6px",width:"100%",background:"transparent",border:"0.5px solid #2a2a38",borderRadius:5,color:C.text}}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {plannerTab!=="weekly"&&(
+                <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,alignItems:"flex-start"}}>
+                  {pd.map(col=>(
+                    <div key={col.id} className="pc">
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                        <span style={{fontSize:13,fontWeight:600,color:C.text}}>{col.title}</span>
+                        <button className="btn btn-sm btnr" onClick={()=>delPlannerCol(col.id)}><i className="ti ti-trash" aria-hidden/></button>
+                      </div>
+                      {col.cards.map(card=>(
+                        <div key={card.id} className="pcard" style={{marginBottom:5}}>
+                          <span style={{flex:1,lineHeight:1.5,fontSize:13}}>{card.text}</span>
+                          <button onClick={()=>delPlannerCard(col.id,card.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,flexShrink:0}}>×</button>
+                        </div>
+                      ))}
+                      {addCard===col.id
+                        ?<div style={{display:"flex",flexDirection:"column",gap:5,marginTop:4}}>
+                          <textarea rows={2} autoFocus placeholder="Texto do card..." value={cardTxt[col.id]||""} onChange={e=>setCardTxt(t=>({...t,[col.id]:e.target.value}))} style={{fontSize:13,resize:"vertical"}}/>
+                          <div style={{display:"flex",gap:4}}>
+                            <button className="btn btn-sm btng" style={{flex:1}} onClick={()=>addPlannerCard(col.id,cardTxt[col.id]||"")}>Adicionar</button>
+                            <button className="btn btn-sm" style={{flex:1}} onClick={()=>setAddCard(null)}>Cancelar</button>
+                          </div>
+                        </div>
+                        :<button className="btn" style={{width:"100%",justifyContent:"center",fontSize:12,marginTop:4}} onClick={()=>setAddCard(col.id)}><i className="ti ti-plus" aria-hidden/>Card</button>
+                      }
                     </div>
                   ))}
-                  {addCard===col.id
-                    ?<div style={{display:"flex",flexDirection:"column",gap:5,marginTop:4}}>
-                      <textarea rows={2} autoFocus placeholder="Texto do card..." value={cardTxt[col.id]||""} onChange={e=>setCardTxt(t=>({...t,[col.id]:e.target.value}))} style={{fontSize:13,resize:"vertical"}}/>
-                      <div style={{display:"flex",gap:4}}>
-                        <button className="btn btn-sm btng" style={{flex:1}} onClick={()=>addPlannerCard(col.id,cardTxt[col.id]||"")}>Adicionar</button>
-                        <button className="btn btn-sm" style={{flex:1}} onClick={()=>setAddCard(null)}>Cancelar</button>
-                      </div>
-                    </div>
-                    :<button className="btn" style={{width:"100%",justifyContent:"center",fontSize:12,marginTop:4}} onClick={()=>setAddCard(col.id)}><i className="ti ti-plus" aria-hidden/>Card</button>
-                  }
+                  <div className="pc" style={{minWidth:180,border:"1px dashed #2a2a38",background:"transparent",justifyContent:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"1rem"}}>
+                    {addCol
+                      ?<><input autoFocus placeholder="Nome da coluna" value={colTxt} onChange={e=>setColTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPlannerCol()} style={{fontSize:13}}/>
+                        <div style={{display:"flex",gap:4,width:"100%"}}>
+                          <button className="btn btn-sm btng" style={{flex:1}} onClick={addPlannerCol}>Criar</button>
+                          <button className="btn btn-sm" style={{flex:1}} onClick={()=>setAddCol(false)}>✕</button>
+                        </div></>
+                      :<button className="btn" style={{color:C.muted}} onClick={()=>setAddCol(true)}><i className="ti ti-plus" aria-hidden/>Nova coluna</button>
+                    }
+                  </div>
                 </div>
-              ))}
-              <div className="pc" style={{minWidth:180,border:"1px dashed #2a2a38",background:"transparent",justifyContent:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"1rem"}}>
-                {addCol
-                  ?<><input autoFocus placeholder="Nome da coluna" value={colTxt} onChange={e=>setColTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPlannerCol()} style={{fontSize:13}}/>
-                    <div style={{display:"flex",gap:4,width:"100%"}}>
-                      <button className="btn btn-sm btng" style={{flex:1}} onClick={addPlannerCol}>Criar</button>
-                      <button className="btn btn-sm" style={{flex:1}} onClick={()=>setAddCol(false)}>✕</button>
-                    </div></>
-                  :<button className="btn" style={{color:C.muted}} onClick={()=>setAddCol(true)}><i className="ti ti-plus" aria-hidden/>Nova coluna</button>
-                }
-              </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── MODALS ── */}
         {modal==="topic"&&<ModalWrap title="Novo Tópico" onClose={()=>setModal(null)}><TopicForm val={nt} set={setNt} onSave={addTopic} folders={folders}/></ModalWrap>}
