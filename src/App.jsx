@@ -198,7 +198,63 @@ function RevForm({val,set,onSave}){
   );
 }
 
+function AuthScreen(){
+  const [email,setEmail]=useState("");
+  const [pw,setPw]=useState("");
+  const [mode,setMode]=useState("login");
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState(null);
+  const [msg,setMsg]=useState(null);
+  const handle=async(e)=>{
+    e?.preventDefault();
+    if(!email.trim()||!pw.trim()){setErr("Preencha e-mail e senha.");return;}
+    setLoading(true);setErr(null);setMsg(null);
+    try{
+      if(mode==="login"){
+        const{error}=await sb.auth.signInWithPassword({email:email.trim(),password:pw});
+        if(error)throw error;
+      }else{
+        const{error}=await sb.auth.signUp({email:email.trim(),password:pw});
+        if(error)throw error;
+        setMsg("Cadastro realizado! Verifique seu e-mail para confirmar.");
+      }
+    }catch(e2){setErr(e2.message);}
+    finally{setLoading(false);}
+  };
+  return(
+    <div style={{minHeight:"100vh",background:"#0f0f13",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"}}>
+      <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:16,padding:"2.5rem 2rem",width:"100%",maxWidth:400,boxShadow:"0 20px 60px #00000060"}}>
+        <div style={{textAlign:"center",marginBottom:"2rem"}}>
+          <div style={{fontSize:36,marginBottom:8}}>🧠</div>
+          <h1 style={{color:"#e8e8f2",fontSize:22,fontWeight:700,margin:0}}>NeuroStudy</h1>
+          <p style={{color:"#6b6b85",fontSize:13,marginTop:6}}>{mode==="login"?"Entre para acessar seus estudos":"Crie sua conta gratuita"}</p>
+        </div>
+        <form onSubmit={handle} style={{display:"flex",flexDirection:"column",gap:12}}>
+          <input type="email" placeholder="Seu e-mail" value={email} onChange={e=>setEmail(e.target.value)}
+            style={{background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:9,padding:"11px 14px",color:"#e8e8f2",fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+          <input type="password" placeholder="Senha (mín. 6 caracteres)" value={pw} onChange={e=>setPw(e.target.value)}
+            style={{background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:9,padding:"11px 14px",color:"#e8e8f2",fontSize:14,outline:"none",fontFamily:"inherit"}}/>
+          {err&&<div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"9px 12px",color:"#fca5a5",fontSize:13}}>{err}</div>}
+          {msg&&<div style={{background:"#0d2218",border:"0.5px solid #1D6B50",borderRadius:8,padding:"9px 12px",color:"#34C98A",fontSize:13}}>{msg}</div>}
+          <button type="submit" disabled={loading}
+            style={{background:"#534AB7",border:"none",borderRadius:9,padding:"12px",color:"#fff",fontSize:15,fontWeight:600,cursor:loading?"not-allowed":"pointer",opacity:loading?0.7:1,fontFamily:"inherit",marginTop:4}}>
+            {loading?"Aguarde...":(mode==="login"?"Entrar":"Criar conta")}
+          </button>
+        </form>
+        <div style={{textAlign:"center",marginTop:"1.25rem"}}>
+          <button onClick={()=>{setMode(m=>m==="login"?"signup":"login");setErr(null);setMsg(null);}}
+            style={{background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:13,fontFamily:"inherit",textDecoration:"underline"}}>
+            {mode==="login"?"Não tem conta? Cadastre-se aqui":"Já tem conta? Fazer login"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
+  const [session,setSession]=useState(null);
+  const [authLoading,setAuthLoading]=useState(true);
   const [loaded,setLoaded]=useState(false);
   const [view,setView]=useState(()=>LS.get("view","dashboard"));
   const [aArea,setAArea]=useState("neuro");
@@ -261,18 +317,25 @@ export default function App(){
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
 
   useEffect(()=>{
+    sb.auth.getSession().then(({data:{session:s}})=>{setSession(s);setAuthLoading(false);});
+    const{data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>setSession(s));
+    return()=>subscription.unsubscribe();
+  },[]);
+
+  useEffect(()=>{
+    if(!session){return;}
     if(LS.get("topics",[]).length===0) setTopics(SEED_TOPICS);
     if(LS.get("revRows",[]).length===0) setRevRows(SEED_REV_ROWS);
     setLoaded(true);
     (async()=>{
       try{
         const [t,r,b,g,sl,k]=await Promise.all([
-          sb.from('topics').select('*').order('created_at',{ascending:false}),
-          sb.from('rev_rows').select('*').order('base_date',{ascending:false}),
-          sb.from('books').select('*').order('updated_at',{ascending:false}),
-          sb.from('goals').select('*'),
+          sb.from('topics').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
+          sb.from('rev_rows').select('*').eq('user_id',session.user.id).order('base_date',{ascending:false}),
+          sb.from('books').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
+          sb.from('goals').select('*').eq('user_id',session.user.id),
           sb.from('study_logs').select('*').order('log_date',{ascending:false}).limit(90),
-          sb.from('knowledge').select('*').order('updated_at',{ascending:false}),
+          sb.from('knowledge').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
         ]);
         const mi=(l,r)=>{const m=new Map();l.forEach(x=>m.set(String(x.id),x));r.forEach(x=>{const ex=m.get(String(x.id));if(!ex||(x.updated_at&&(!ex.updated_at||x.updated_at>ex.updated_at)))m.set(String(x.id),x);});return[...m.values()];};
         if(t.data?.length>0){setTopics(p=>{const m=mi(p,t.data);LS.set("topics",m);return m;});}
@@ -283,7 +346,7 @@ export default function App(){
         setSyncMsg("☁️ Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
       }catch{}
     })();
-  },[]);
+  },[session]);
 
   const getNextRev=useCallback((row)=>{const ch=row.checks||[];for(let i=0;i<8;i++){if(!ch[i])return row.revs?.[i]||null;}return null;},[]);
   const getStatus=useCallback((row)=>{const n=getNextRev(row);if(!n)return"completo";if(n<=t0)return"vencida";if(Math.round((new Date(n)-new Date(t0))/864e5)<=3)return"proxima";return"ok";},[getNextRev,t0]);
@@ -296,7 +359,7 @@ export default function App(){
 
   const addTopic=useCallback(async()=>{
     const tags=nt.tags.split(",").map(t=>t.trim()).filter(Boolean);const id=Date.now();
-    const topic={id,area:nt.area,folder_id:nt.folder_id||null,title:nt.title,notes:nt.notes,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null};
+    const topic={id,area:nt.area,folder_id:nt.folder_id||null,title:nt.title,notes:nt.notes,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null,user_id:session?.user?.id||null};
     setTopics(p=>[topic,...p]);setModal(null);setNt({title:"",notes:"",tags:"",area:"neuro",folder_id:""});
     try{await sb.from('topics').upsert({...topic,updated_at:new Date().toISOString()});}catch{}
   },[nt]);
@@ -376,7 +439,7 @@ export default function App(){
 
   const addRevRow=useCallback(async()=>{
     const id="r"+Date.now();const revs=calcRevDates(nr.base_date);
-    const row={id,topic:nr.topic,cat:nr.cat,base_date:nr.base_date,checks:[0,0,0,0,0,0,0,0],revs};
+    const row={id,topic:nr.topic,cat:nr.cat,base_date:nr.base_date,checks:[0,0,0,0,0,0,0,0],revs,user_id:session?.user?.id||null};
     setRevRows(p=>[...p,row]);setModal(null);setNr({topic:"",cat:"Neuro",base_date:t0});
     try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
   },[nr,t0]);
@@ -389,21 +452,21 @@ export default function App(){
   const addTopicToReview=useCallback(async(topic)=>{
     const id="t"+topic.id;if(revRows.find(r=>r.id===id)){alert("Tópico já está na revisão.");return;}
     const catLabel=AREAS.find(a=>a.id===topic.area)?.label||"Geral";
-    const row={id,topic:topic.title,cat:catLabel,base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0)};
+    const row={id,topic:topic.title,cat:catLabel,base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
     setRevRows(p=>[...p.filter(r=>r.id!==id),row]);
     try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
   },[t0,revRows]);
 
   const updateBook=useCallback(async(id,changes)=>{setBooks(p=>p.map(b=>b.id===id?{...b,...changes}:b));try{await sb.from('books').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);}catch{}},[]);
-  const addBook=useCallback(async()=>{const id=Date.now();const book={id,title:nb.title,author:nb.author,area:nb.area,status:nb.status,progress:0,notes:nb.notes,chapters:[]};setBooks(p=>[...p,book]);setModal(null);setNb({title:"",author:"",area:"livros",status:"queued",notes:""});try{await sb.from('books').upsert({...book,updated_at:new Date().toISOString()});}catch{}},[nb]);
+  const addBook=useCallback(async()=>{const id=Date.now();const book={id,title:nb.title,author:nb.author,area:nb.area,status:nb.status,progress:0,notes:nb.notes,chapters:[],user_id:session?.user?.id||null};setBooks(p=>[...p,book]);setModal(null);setNb({title:"",author:"",area:"livros",status:"queued",notes:""});try{await sb.from('books').upsert({...book,updated_at:new Date().toISOString()});}catch{}},[nb]);
   const deleteBook=useCallback(async(id)=>{if(!confirm("Excluir livro?"))return;setBooks(p=>p.filter(b=>b.id!==id));try{await sb.from('books').delete().eq('id',id);}catch{}},[]);
   const addChapter=useCallback(async(bId,title)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=[...(book.chapters||[]),{id:Date.now(),title,resumo:"",perguntas:"",insights:"",created_at:Date.now()}];setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
   const updateChapter=useCallback(async(bId,chId,changes)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,...changes}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
   const deleteChapter=useCallback(async(bId,chId)=>{if(!confirm("Excluir capítulo?"))return;const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).filter(c=>c.id!==chId);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
   const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const addBookToReview=useCallback(async(book)=>{const id="book_"+book.id;if(revRows.find(r=>r.id===id)){alert("Livro já está na revisão.");return;}const row={id,topic:book.title+" (Livro)",cat:AREAS.find(a=>a.id===book.area)?.label||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0)};setRevRows(p=>[...p.filter(r=>r.id!==id),row]);try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}},[t0,revRows]);
+  const addBookToReview=useCallback(async(book)=>{const id="book_"+book.id;if(revRows.find(r=>r.id===id)){alert("Livro já está na revisão.");return;}const row={id,topic:book.title+" (Livro)",cat:AREAS.find(a=>a.id===book.area)?.label||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};setRevRows(p=>[...p.filter(r=>r.id!==id),row]);try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}},[t0,revRows]);
 
-  const addGoal=useCallback(async()=>{const id=Date.now();const goal={id,area:ng.area,title:ng.title,target:Number(ng.target),done:0,unit:ng.unit,period:ng.period,history:[]};setGoals(p=>[...p,goal]);setModal(null);setNg({area:"neuro",title:"",target:"",unit:"",period:"anual"});try{await sb.from('goals').upsert({...goal,updated_at:new Date().toISOString()});}catch{}},[ng]);
+  const addGoal=useCallback(async()=>{const id=Date.now();const goal={id,area:ng.area,title:ng.title,target:Number(ng.target),done:0,unit:ng.unit,period:ng.period,history:[],user_id:session?.user?.id||null};setGoals(p=>[...p,goal]);setModal(null);setNg({area:"neuro",title:"",target:"",unit:"",period:"anual"});try{await sb.from('goals').upsert({...goal,updated_at:new Date().toISOString()});}catch{}},[ng]);
   const updateGoalDone=useCallback(async(id,val)=>{const done=Math.max(0,Number(val));setGoals(p=>p.map(g=>g.id===id?{...g,done}:g));try{await sb.from('goals').update({done,updated_at:new Date().toISOString()}).eq('id',id);}catch{}},[]);
   const deleteGoal=useCallback(async(id)=>{if(!confirm("Excluir meta?"))return;setGoals(p=>p.filter(g=>g.id!==id));try{await sb.from('goals').delete().eq('id',id);}catch{}},[]);
   const addGoalNote=useCallback(async(gId)=>{const txt=(goalNotes[gId]||"").trim();if(!txt)return;const goal=goals.find(g=>g.id===gId);if(!goal)return;const history=[...(goal.history||[]),{date:t0,text:txt}];setGoals(p=>p.map(g=>g.id===gId?{...g,history}:g));setGoalNotes(n=>({...n,[gId]:""}));try{await sb.from('goals').update({history,updated_at:new Date().toISOString()}).eq('id',gId);}catch{}},[goals,goalNotes,t0]);
@@ -554,6 +617,14 @@ export default function App(){
     );
   };
 
+  // ── Auth guards ──
+  if(authLoading) return(
+    <div style={{minHeight:"100vh",background:"#0f0f13",display:"flex",alignItems:"center",justifyContent:"center",color:"#6b6b85",fontFamily:"inherit",fontSize:14}}>
+      <span style={{animation:"spin 1s linear infinite",fontSize:28,display:"block"}}>⟳</span>
+    </div>
+  );
+  if(!session) return <AuthScreen/>;
+
   return(
     <>
       <style>{CSS}</style>
@@ -572,6 +643,12 @@ export default function App(){
         ))}
         <div style={{marginTop:"auto",paddingTop:12,borderTop:`0.5px solid ${C.bord}`}}>
           <div style={{fontSize:10,color:C.muted,padding:"4px 9px"}}>{Object.values(weekStudy).reduce((a,b)=>a+b,0).toFixed(1)}h esta semana</div>
+          <div style={{fontSize:11,color:"#6b6b85",padding:"4px 9px 6px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={session.user.email}>
+            <i className="ti ti-user-circle" style={{marginRight:4}}/>{session.user.email}
+          </div>
+          <button className="ni" style={{color:"#fca5a5"}} onClick={()=>{if(window.confirm("Sair da conta?"))sb.auth.signOut();}}>
+            <i className="ti ti-logout" style={{fontSize:15}}/>Sair
+          </button>
         </div>
       </nav>
       <main className="main">
