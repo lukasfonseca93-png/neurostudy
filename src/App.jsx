@@ -307,6 +307,7 @@ export default function App(){
   const [weeklySchedule,setWeeklySchedule]=useState(()=>LS.get("weeklySchedule",{}));
   const [plannerTab,setPlannerTab]=useState("weekly");
   const [wInputs,setWInputs]=useState({});
+  const [topicTab,setTopicTab]=useState({});
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
@@ -347,18 +348,22 @@ export default function App(){
   useEffect(()=>{
     if(!loaded)return;
     LS.set("folders",folders);
-    saveSettings(folders,weekStudy);
+    saveSettings(folders,weekStudy,weeklySchedule);
   },[folders,loaded]);
   useEffect(()=>{if(loaded)LS.set("revRows",revRows);},[revRows,loaded]);
   useEffect(()=>{if(loaded)LS.set("books",books);},[books,loaded]);
   useEffect(()=>{if(loaded)LS.set("goals",goals);},[goals,loaded]);
   useEffect(()=>{if(loaded)LS.set("knowledge",knowledge);},[knowledge,loaded]);
   useEffect(()=>{if(loaded)LS.set("planner",planner);},[planner,loaded]);
-  useEffect(()=>{if(loaded)LS.set("weeklySchedule",weeklySchedule);},[weeklySchedule,loaded]);
+  useEffect(()=>{
+    if(!loaded)return;
+    LS.set("weeklySchedule",weeklySchedule);
+    saveSettings(folders,weekStudy,weeklySchedule);
+  },[weeklySchedule,loaded]);
   useEffect(()=>{
     if(!loaded)return;
     LS.set("weekStudy",weekStudy);
-    saveSettings(folders,weekStudy);
+    saveSettings(folders,weekStudy,weeklySchedule);
   },[weekStudy,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
@@ -396,6 +401,7 @@ export default function App(){
         if(st.data){
           if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
           if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
+          if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
         }
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
@@ -410,7 +416,7 @@ export default function App(){
   const getStatus=useCallback((row)=>{const n=getNextRev(row);if(!n)return"completo";if(n<=t0)return"vencida";if(Math.round((new Date(n)-new Date(t0))/864e5)<=3)return"proxima";return"ok";},[getNextRev,t0]);
   const due=topics.filter(t=>t.next_review&&t.next_review<=Date.now()+864e5).length;
   const filteredXl=revRows.filter(r=>{const ms=revSearch.toLowerCase();return(revFilter==="Todas"||r.cat===revFilter)&&(!ms||r.topic.toLowerCase().includes(ms));});
-  const pendentesXl=revRows.filter(r=>getStatus(r)==="vencida"||getStatus(r)==="proxima").sort((a,b)=>(getNextRev(a)||"")>(getNextRev(b)||"")?1:-1);
+  const pendentesXl=revRows.filter(r=>getStatus(r)==="vencida").sort((a,b)=>(getNextRev(a)||"")>(getNextRev(b)||"")?1:-1);
 
   const toggleAreaCollapse=(id)=>setCollapsedAreas(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleFolderCollapse=(key)=>setCollapsedFolders(p=>{const n=new Set(p);n.has(key)?n.delete(key):n.add(key);return n;});
@@ -421,6 +427,16 @@ export default function App(){
     setTopics(p=>[topic,...p]);setModal(null);setNt({title:"",notes:"",tags:"",area:"neuro",folder_id:""});
     try{await sb.from('topics').upsert({...topic,updated_at:new Date().toISOString()});}catch{}
   },[nt]);
+
+  const saveFichamento=useCallback(async(id,field,value)=>{
+    setTopics(p=>p.map(t=>{
+      if(t.id!==id)return t;
+      const fich={...(t.fichamento||{}),[field]:value};
+      const ts=new Date().toISOString();
+      sb.from('topics').update({fichamento:fich,updated_at:ts}).eq('id',id).catch(()=>{});
+      return{...t,fichamento:fich,updated_at:ts};
+    }));
+  },[]);
 
   const deleteTopic=useCallback(async(id)=>{
     if(!confirm("Excluir tópico?"))return;
@@ -513,7 +529,7 @@ export default function App(){
     try{for(const id of ids)await sb.from('topics').update(changes).eq('id',id);}catch{}
   };;
 
-  const saveSettings=useCallback(async(newFolders,newWeekStudy)=>{
+  const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule)=>{
     if(!session?.user?.id)return;
     clearTimeout(settingsTimer.current);
     settingsTimer.current=setTimeout(async()=>{
@@ -521,6 +537,7 @@ export default function App(){
         user_id:session.user.id,
         folders:newFolders,
         week_study:newWeekStudy,
+        weekly_schedule:newWeeklySchedule,
         updated_at:new Date().toISOString()
       },{onConflict:'user_id'});}catch{}
     },1500);
@@ -644,43 +661,87 @@ export default function App(){
           </div>
         </div>
         {exp&&(
-          <div style={{padding:"8px 14px 14px",borderTop:`0.5px solid ${C.bord}`}}>
-            <input className="title-inline"
-              key={"ti"+t.id+(t.updated_at||0)}
-              defaultValue={t.title}
-              onBlur={e=>{if(e.target.value!==t.title)saveTopicEdits(t.id,{title:e.target.value});}}
-              style={{marginBottom:8}}/>
-            <textarea className="inline-edit"
-              key={"ta"+t.id+(t.updated_at||0)}
-              rows={Math.max(4,(t.notes||"").split("\n").length+1)}
-              defaultValue={t.notes??""}
-              placeholder="Clique e comece a digitar..."
-              onBlur={e=>{if(e.target.value!==(t.notes||""))saveTopicEdits(t.id,{notes:e.target.value});}}/>
-            <input
-              key={"tg"+t.id+(t.updated_at||0)}
-              defaultValue={(t.tags||[]).join(", ")}
-              onBlur={e=>{if(e.target.value!==(t.tags||[]).join(", "))saveTopicEdits(t.id,{tags:e.target.value});}}
-              placeholder="Tags separadas por vírgula" style={{fontSize:11,marginTop:6}}/>
-            {linkedRev&&(
-              <div style={{background:"#1a2840",border:"0.5px solid #2a3850",borderRadius:8,padding:"8px 12px",marginTop:8}}>
-                <div style={{fontSize:10,color:"#93c5fd",fontWeight:500,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Revisões Espaçadas</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                  {(linkedRev.revs||[]).map((rev,i)=>{
-                    const ch=linkedRev.checks||[];const done=ch[i]===1;const vencida=!done&&rev<=t0;
-                    return(<button key={i} onClick={()=>toggleXlCheck(linkedRev.id,i)} title={`${REV_LABELS[i]} — ${rev}`}
-                      style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,background:done?"#0d2218":vencida?"#2d1010":"#12121a",color:done?"#34C98A":vencida?"#fca5a5":"#6b6b85",fontWeight:done?600:400}}>
-                      {REV_LABELS[i]}{done?" ✓":vencida?" !":""}
-                    </button>);
-                  })}
+          <div style={{borderTop:`0.5px solid ${C.bord}`}}>
+            <div style={{padding:"10px 14px 0"}}>
+              <input className="title-inline"
+                key={"ti"+t.id+(t.updated_at||0)}
+                defaultValue={t.title}
+                onBlur={e=>{if(e.target.value!==t.title)saveTopicEdits(t.id,{title:e.target.value});}}/>
+            </div>
+            <div style={{display:"flex",gap:5,padding:"8px 14px",borderBottom:`0.5px solid ${C.bord}`}}>
+              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"}].map(tab=>{
+                const active=(topicTab[t.id]||"notes")===tab.id;
+                return(<button key={tab.id} onClick={()=>setTopicTab(p=>({...p,[t.id]:tab.id}))}
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?"#3d3780":C.bord}`,background:active?"#1c1838":"transparent",color:active?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
+                  <i className={`ti ${tab.icon}`}/>{tab.l}
+                </button>);
+              })}
+            </div>
+            {(topicTab[t.id]||"notes")==="notes"&&(
+              <div style={{padding:"10px 14px 14px"}}>
+                <textarea className="inline-edit"
+                  key={"ta"+t.id+(t.updated_at||0)}
+                  rows={Math.max(4,(t.notes||"").split("\n").length+1)}
+                  defaultValue={t.notes??""}
+                  placeholder="Clique e comece a digitar..."
+                  onBlur={e=>{if(e.target.value!==(t.notes||""))saveTopicEdits(t.id,{notes:e.target.value});}}/>
+                <input
+                  key={"tg"+t.id+(t.updated_at||0)}
+                  defaultValue={(t.tags||[]).join(", ")}
+                  onBlur={e=>{if(e.target.value!==(t.tags||[]).join(", "))saveTopicEdits(t.id,{tags:e.target.value});}}
+                  placeholder="Tags separadas por vírgula" style={{fontSize:11,marginTop:6}}/>
+                {linkedRev&&(
+                  <div style={{background:"#1a2840",border:"0.5px solid #2a3850",borderRadius:8,padding:"8px 12px",marginTop:8}}>
+                    <div style={{fontSize:10,color:"#93c5fd",fontWeight:500,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Revisões Espaçadas</div>
+                    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                      {(linkedRev.revs||[]).map((rev,i)=>{
+                        const ch=linkedRev.checks||[];const done=ch[i]===1;const vencida=!done&&rev<=t0;
+                        return(<button key={i} onClick={()=>toggleXlCheck(linkedRev.id,i)} title={`${REV_LABELS[i]} — ${rev}`}
+                          style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,background:done?"#0d2218":vencida?"#2d1010":"#12121a",color:done?"#34C98A":vencida?"#fca5a5":"#6b6b85",fontWeight:done?600:400}}>
+                          {REV_LABELS[i]}{done?" ✓":vencida?" !":""}
+                        </button>);
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div style={{display:"flex",gap:8,fontSize:11,color:C.muted,marginTop:8}}>
+                  <span>Rep #{t.repetitions||0}</span>
+                  <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
+                  <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
               </div>
             )}
-            <div style={{display:"flex",gap:8,fontSize:11,color:C.muted,marginTop:8}}>
-              <span>Rep #{t.repetitions||0}</span>
-              <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
-              {t.quiz_cache&&<span style={{color:"#34C98A"}}>Quiz ✓</span>}
-              <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
-            </div>
+            {topicTab[t.id]==="fichamento"&&(
+              <div style={{padding:"12px 14px 16px",display:"flex",flexDirection:"column",gap:10,background:"#0f0f13"}}>
+                {[
+                  {k:"resumo",    l:"📋 Resumo do Tópico",  icon:"ti-notes",       color:"#9D95E8", ph:"Pontos principais, definição, o que é essencial saber..."},
+                  {k:"perguntas", l:"❓ Perguntas-chave",   icon:"ti-help-circle", color:"#60A5FA", ph:"• Que problema este conceito resolve?\n• Qual a ideia central?\n• Como se aplica na prática?"},
+                  {k:"insights",  l:"💡 Insights",          icon:"ti-bulb",        color:"#FBBF24", ph:"• Insight 1: ...\n• Aplicação na minha vida: ...\n• O que mudou na minha visão: ..."},
+                  {k:"conexoes",  l:"🔗 Conexões",          icon:"ti-link",        color:"#34C98A", ph:"• Relaciona com: ...\n• Contrasta com: ...\n• Complementa: ..."},
+                ].map(f=>{
+                  const val=(t.fichamento||{})[f.k]||"";
+                  return(
+                    <div key={f.k} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
+                      <div style={{fontSize:11,color:f.color,fontWeight:600,marginBottom:7,display:"flex",alignItems:"center",gap:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                        <i className={`ti ${f.icon}`}/>{f.l}
+                      </div>
+                      <textarea
+                        key={"fich-"+t.id+"-"+f.k+"-"+(t.updated_at||0)}
+                        rows={Math.max(3,val.split("\n").length+1)}
+                        placeholder={f.ph}
+                        defaultValue={val}
+                        onBlur={e=>{if(e.target.value!==val)saveFichamento(t.id,f.k,e.target.value);}}
+                        style={{fontSize:13,resize:"vertical",lineHeight:1.8,background:"transparent",border:"none",padding:0,color:C.text,width:"100%",outline:"none",fontFamily:"inherit"}}/>
+                    </div>
+                  );
+                })}
+                <div style={{fontSize:11,color:C.muted,display:"flex",gap:10,paddingTop:6,borderTop:`0.5px solid ${C.bord}`}}>
+                  <span>Rep #{t.repetitions||0}</span>
+                  <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
+                  <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
