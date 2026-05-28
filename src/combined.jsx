@@ -368,11 +368,7 @@ export default function App(){
     LS.set("weekStudy",weekStudy);
     saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
   },[weekStudy,loaded]);
-  useEffect(()=>{
-    if(!loaded)return;
-    LS.set("readingPlan",readingPlan);
-    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
-  },[readingPlan,loaded]);
+  useEffect(()=>{if(loaded)LS.set("readingPlan",readingPlan);},[readingPlan,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
@@ -410,7 +406,7 @@ export default function App(){
           if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
           if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
           if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
-          if(st.data.reading_plan){setReadingPlan(st.data.reading_plan);LS.set("readingPlan",st.data.reading_plan);}
+          {const rp=st.data.reading_plan;if(rp&&(rp.columns?.length>0||Object.keys(rp.rows||{}).length>0)){setReadingPlan(rp);LS.set("readingPlan",rp);}}
         }
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
@@ -547,6 +543,16 @@ export default function App(){
     setSelectedTopics(new Set());setBulkMoveModal(false);
     try{for(const id of ids)await sb.from('topics').update(changes).eq('id',id);}catch{}
   };;
+
+  const saveReadingPlan=useCallback(async(plan)=>{
+    if(!session?.user?.id)return;
+    LS.set("readingPlan",plan);
+    try{await sb.from('user_settings').upsert({
+      user_id:session.user.id,
+      reading_plan:plan,
+      updated_at:new Date().toISOString()
+    },{onConflict:'user_id'});}catch(e){console.error('[saveReadingPlan]',e)}
+  },[session]);
 
   const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule,newReadingPlan)=>{
     if(!session?.user?.id)return;
@@ -1391,10 +1397,10 @@ export default function App(){
           const updatePlanCell=(rowKey,col,val)=>{
             const nr={...readingPlan,rows:{...readingPlan.rows,[rowKey]:{...(readingPlan.rows[rowKey]||{}),[col]:val}}};
             setReadingPlan(nr);
-            saveSettings(folders,weekStudy,weeklySchedule,nr);
+            saveReadingPlan(nr);
           };
-          const addPlanCol=()=>{const name=prompt("Nome da categoria:");if(name?.trim()&&!readingPlan.columns.includes(name.trim())){const nc={...readingPlan,columns:[...readingPlan.columns,name.trim()]};setReadingPlan(nc);saveSettings(folders,weekStudy,weeklySchedule,nc);}};
-          const removePlanCol=(col)=>{if(confirm(`Remover coluna "${col}"?`)){const nc={...readingPlan,columns:readingPlan.columns.filter(c=>c!==col)};setReadingPlan(nc);saveSettings(folders,weekStudy,weeklySchedule,nc);}};
+          const addPlanCol=()=>{const name=prompt("Nome da categoria:");if(name?.trim()&&!readingPlan.columns.includes(name.trim())){const nc={...readingPlan,columns:[...readingPlan.columns,name.trim()]};setReadingPlan(nc);saveReadingPlan(nc);}};
+          const removePlanCol=(col)=>{if(confirm(`Remover coluna "${col}"?`)){const nc={...readingPlan,columns:readingPlan.columns.filter(c=>c!==col)};setReadingPlan(nc);saveReadingPlan(nc);}};
           const CAT_COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A","#F87171","#FB923C","#A78BFA"];
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
