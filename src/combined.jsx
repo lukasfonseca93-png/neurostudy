@@ -559,7 +559,7 @@ export default function App(){
         weekly_schedule:newWeeklySchedule,
         reading_plan:newReadingPlan!==undefined?newReadingPlan:readingPlan,
         updated_at:new Date().toISOString()
-      },{onConflict:'user_id'});}catch{}
+      },{onConflict:'user_id'});}catch(e){console.error('[saveSettings]',e)}
     },1500);
   },[session]);
 
@@ -590,13 +590,13 @@ export default function App(){
     try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
   },[t0,revRows]);
 
-  const updateBook=useCallback(async(id,changes)=>{setBooks(p=>p.map(b=>b.id===id?{...b,...changes}:b));try{await sb.from('books').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);}catch{}},[]);
+  const updateBook=useCallback(async(id,changes)=>{setBooks(p=>p.map(b=>b.id===id?{...b,...changes}:b));try{await sb.from('books').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);}catch(e){console.error('[updateBook]',e)}},[]);
   const addBook=useCallback(async()=>{const id=Date.now();const book={id,title:nb.title,author:nb.author,area:nb.area,status:nb.status,progress:0,notes:nb.notes,chapters:[],user_id:session?.user?.id||null};setBooks(p=>[...p,book]);setModal(null);setNb({title:"",author:"",area:"livros",status:"queued",notes:""});try{await sb.from('books').upsert({...book,updated_at:new Date().toISOString()});}catch{}},[nb]);
   const deleteBook=useCallback(async(id)=>{if(!confirm("Excluir livro?"))return;setBooks(p=>p.filter(b=>b.id!==id));try{await sb.from('books').delete().eq('id',id);}catch{}},[]);
-  const addChapter=useCallback(async(bId,title)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=[...(book.chapters||[]),{id:Date.now(),title,resumo:"",perguntas:"",insights:"",created_at:Date.now()}];setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const updateChapter=useCallback(async(bId,chId,changes)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,...changes}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const deleteChapter=useCallback(async(bId,chId)=>{if(!confirm("Excluir capítulo?"))return;const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).filter(c=>c.id!==chId);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
+  const addChapter=useCallback(async(bId,title)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=[...(book.chapters||[]),{id:Date.now(),title,resumo:"",perguntas:"",insights:"",created_at:Date.now()}];setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
+  const updateChapter=useCallback(async(bId,chId,changes)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,...changes}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
+  const deleteChapter=useCallback(async(bId,chId)=>{if(!confirm("Excluir capítulo?"))return;const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).filter(c=>c.id!==chId);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
+  const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
   const addChapterToReview=useCallback(async(book,ch)=>{
     const id="ch_"+ch.id;if(revRows.find(r=>r.id===id)){alert("Capítulo já está na revisão.");return;}
     const catLabel=AREAS.find(a=>a.id===book.area)?.label||"Geral";
