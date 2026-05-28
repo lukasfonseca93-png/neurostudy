@@ -761,6 +761,23 @@ export default function App(){
             {/* ── ABA VISÃO IA ── */}
             {topicTab[t.id]==="ia"&&(()=>{
               const ai=topicAI[t.id]||{};
+              /* ── Offline extractive summarizer ── */
+              const buildOffline=()=>{
+                const notes=t.notes||"";if(notes.length<30)return;
+                const STOP=new Set(["a","o","e","é","de","do","da","em","um","uma","para","com","que","se","os","as","dos","das","no","na","por","mais","mas","ao","ou","não","já","isso","esse","esta","este","quando","sobre","após","entre","então","assim","muito","qual","cada","todo","toda","outros","podem","deve","pelo","pela","nos","nas","seu","sua","seus","suas","esse","essa","aquele","porque","como","onde","há","está","eram","será","foram","tinha","tem","este","estes","estas","esses","essas","ser","ter","foi","são","pelos","pelas","num","numa","também","ele","ela","eles","elas","seu","sua"]);
+                const sents=notes.split(/[.!?
+]+/).map(s=>s.trim()).filter(s=>s.length>25&&s.length<400);
+                const wFreq={};
+                notes.toLowerCase().replace(/[^a-záàâãéèêíìîóòôõúùûç\s]/g," ").split(/\s+/).forEach(w=>{if(w.length>3&&!STOP.has(w))wFreq[w]=(wFreq[w]||0)+1;});
+                const topKw=Object.entries(wFreq).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([w])=>w);
+                const scored=sents.map((s,i)=>{const sw=s.toLowerCase().split(/\s+/);const sc=sw.reduce((sum,w)=>sum+(wFreq[w]||0),0)/Math.max(1,sw.length);return{text:s,score:sc+(i===0?3:i<2?1.5:0),idx:i};});
+                const top=scored.sort((a,b)=>b.score-a.score).slice(0,5).sort((a,b)=>a.idx-b.idx);
+                const COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A"];
+                const cs=Math.ceil(topKw.length/4);
+                const ramos=COLORS.map((cor,i)=>{const chunk=topKw.slice(i*cs,(i+1)*cs);if(!chunk.length)return null;return{label:chunk[0].charAt(0).toUpperCase()+chunk[0].slice(1),cor,filhos:chunk.slice(1,5)};}).filter(Boolean);
+                setTopicAI(p=>({...p,[t.id]:{loading:false,error:null,resumo:top.map(s=>s.text).join(" "),mapa:{centro:t.title,ramos},isOffline:true}}));
+              };
+              /* ── SVG mind map renderer ── */
               const renderMapa=(mapa)=>{
                 if(!mapa?.ramos?.length)return null;
                 const W=680,H=460,cx=W/2,cy=H/2;
@@ -770,11 +787,11 @@ export default function App(){
                   const ang=(2*Math.PI/N*i)-Math.PI/2;
                   const bx=cx+140*Math.cos(ang),by=cy+130*Math.sin(ang);
                   lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#9D95E8"}" stroke-width="2.5" opacity="0.6"/>`);
-                  const tw=Math.min(120,Math.max(70,r.label.length*8));
+                  const tw=Math.min(130,Math.max(70,r.label.length*8));
                   lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#9D95E8"}22" stroke="${r.cor||"#9D95E8"}" stroke-width="1.5"/>`);
                   lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#9D95E8"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
                   (r.filhos||[]).forEach((f,j)=>{
-                    const ns=r.filhos.length;const subAng=ang+(j-(ns-1)/2)*0.45;
+                    const ns=r.filhos.length;const subAng=ang+(j-(ns-1)/2)*0.42;
                     const sx=bx+95*Math.cos(subAng),sy=by+85*Math.sin(subAng);
                     lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#9D95E8"}" stroke-width="1" opacity="0.35"/>`);
                     const sw=Math.min(100,Math.max(50,f.length*7));
@@ -789,32 +806,35 @@ export default function App(){
               };
               return(
                 <div style={{padding:"14px",background:"#0f0f13",display:"flex",flexDirection:"column",gap:12}}>
-                  {!ai.resumo&&!ai.loading&&(
-                    <div style={{textAlign:"center",padding:"2rem 1rem"}}>
-                      <div style={{fontSize:36,marginBottom:10}}>🧠</div>
-                      <p style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.6}}>Gere um resumo inteligente e mapa mental visual a partir das suas notas.</p>
-                      <button className="btn btng" onClick={()=>genAIMindMap(t)} style={{fontSize:13,padding:"9px 20px"}}>
-                        <i className="ti ti-wand"/>Gerar Resumo + Mapa Mental
-                      </button>
-                    </div>
-                  )}
-                  {ai.loading&&(
-                    <div style={{textAlign:"center",padding:"2rem",color:"#34C98A"}}>
-                      <i className="ti ti-loader-2" style={{fontSize:28,display:"block",marginBottom:8,animation:"spin 1s linear infinite"}}/>
-                      <span style={{fontSize:13}}>Analisando e gerando mapa mental...</span>
-                    </div>
-                  )}
+                  {/* Botões de ação */}
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    <button className="btn btn-sm btnp" onClick={buildOffline} style={{flex:1,justifyContent:"center"}}>
+                      <i className="ti ti-bolt"/>Resumo Offline <span style={{fontSize:10,opacity:0.7,marginLeft:3}}>grátis · instantâneo</span>
+                    </button>
+                    <button className="btn btn-sm btng" onClick={()=>genAIMindMap(t)} disabled={ai.loading} style={{flex:1,justifyContent:"center"}}>
+                      <i className={`ti ${ai.loading?"ti-loader-2":"ti-wand"}`} style={ai.loading?{animation:"spin 1s linear infinite"}:{}}/>
+                      {ai.loading?"Gerando...":"Resumo com IA"}
+                      <span style={{fontSize:10,opacity:0.7,marginLeft:3}}>requer API key</span>
+                    </button>
+                  </div>
+                  {/* Badge offline/IA */}
+                  {ai.isOffline&&<div style={{fontSize:11,color:"#9D95E8",background:"#1c1838",border:"0.5px solid #3d3780",borderRadius:6,padding:"3px 10px",alignSelf:"flex-start"}}>📝 Gerado offline · baseado em frequência de termos</div>}
+                  {ai.resumo&&!ai.isOffline&&<div style={{fontSize:11,color:"#34C98A",background:"#0d2218",border:"0.5px solid #1D6B50",borderRadius:6,padding:"3px 10px",alignSelf:"flex-start"}}>✨ Gerado pela IA (Claude)</div>}
                   {ai.error&&(
                     <div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#fca5a5"}}>
-                      ⚠️ {ai.error}
+                      ⚠️ {ai.error} — Verifique a API key no Vercel.
                     </div>
                   )}
                   {ai.resumo&&(
-                    <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderLeft:"3px solid #34C98A",borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
-                      <div style={{fontSize:11,color:"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
-                        <i className="ti ti-sparkles"/>Resumo Gerado pela IA
+                    <div style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${ai.isOffline?"#9D95E8":"#34C98A"}`,borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
+                      <div style={{fontSize:11,color:ai.isOffline?"#9D95E8":"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
+                        <i className={`ti ${ai.isOffline?"ti-align-left":"ti-sparkles"}`}/>Resumo em Tópicos
                       </div>
-                      <p style={{fontSize:13,color:C.text,lineHeight:1.8,margin:0}}>{ai.resumo}</p>
+                      <ul style={{margin:0,paddingLeft:16,display:"flex",flexDirection:"column",gap:6}}>
+                        {ai.resumo.split(/(?<=[.!?])\s+/).filter(Boolean).map((s,i)=>(
+                          <li key={i} style={{fontSize:13,color:C.text,lineHeight:1.7}}>{s}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {ai.mapa&&(
@@ -825,10 +845,8 @@ export default function App(){
                       <div dangerouslySetInnerHTML={{__html:renderMapa(ai.mapa)}}/>
                     </div>
                   )}
-                  {ai.resumo&&(
-                    <button className="btn btn-sm" style={{alignSelf:"flex-end",color:C.muted}} onClick={()=>genAIMindMap(t)}>
-                      <i className="ti ti-refresh"/>Regenerar
-                    </button>
+                  {!(t.notes||"").trim()&&(
+                    <p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem"}}>💡 Adicione notas na aba "Notas" para gerar resumo e mapa mental.</p>
                   )}
                 </div>
               );
