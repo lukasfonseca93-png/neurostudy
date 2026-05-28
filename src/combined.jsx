@@ -1394,10 +1394,13 @@ export default function App(){
           const MONTHS_PT=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
           const curYear=new Date().getFullYear();
           const allMonthKeys=MONTHS_PT.map((m,i)=>`${curYear}-${m}`);
+          const planCellTimers=useRef({});
           const updatePlanCell=(rowKey,col,val)=>{
             const nr={...readingPlan,rows:{...readingPlan.rows,[rowKey]:{...(readingPlan.rows[rowKey]||{}),[col]:val}}};
+            LS.set("readingPlan",nr);
             setReadingPlan(nr);
-            saveReadingPlan(nr);
+            clearTimeout(planCellTimers.current[rowKey+"_"+col]);
+            planCellTimers.current[rowKey+"_"+col]=setTimeout(()=>saveReadingPlan(nr),800);
           };
           const addPlanCol=()=>{const name=prompt("Nome da categoria:");if(name?.trim()&&!readingPlan.columns.includes(name.trim())){const nc={...readingPlan,columns:[...readingPlan.columns,name.trim()]};setReadingPlan(nc);saveReadingPlan(nc);}};
           const removePlanCol=(col)=>{if(confirm(`Remover coluna "${col}"?`)){const nc={...readingPlan,columns:readingPlan.columns.filter(c=>c!==col)};setReadingPlan(nc);saveReadingPlan(nc);}};
@@ -1447,8 +1450,8 @@ export default function App(){
                                 <td key={col} style={{padding:4,verticalAlign:"top",borderLeft:mi===0?`0.5px solid ${C.bord}`:"none"}}>
                                   <textarea
                                     key={`rp-${mKey}-${col}`}
-                                    defaultValue={rowData[col]||""}
-                                    onBlur={e=>{if(e.target.value!==(rowData[col]||""))updatePlanCell(mKey,col,e.target.value);}}
+                                    value={rowData[col]||""}
+                                    onChange={e=>updatePlanCell(mKey,col,e.target.value)}
                                     placeholder="—"
                                     rows={3}
                                     style={{
@@ -1460,7 +1463,7 @@ export default function App(){
                                       borderLeft:rowData[col]?`2px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`:undefined
                                     }}
                                     onFocus={e=>{e.target.style.border=`0.5px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`;}}
-                                    onBlurCapture={e=>{if(!e.target.value)e.target.style.border="0.5px solid transparent";}}
+                                    onBlur={e=>{if(!e.target.value)e.target.style.border="0.5px solid transparent";}}
                                   />
                                 </td>
                               ))}
