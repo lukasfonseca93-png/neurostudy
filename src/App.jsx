@@ -114,7 +114,7 @@ const CSS=`
   .tag{background:#12121a;color:#6b6b85;font-size:10px;padding:2px 7px;border-radius:20px;border:0.5px solid #2a2a38;}
   .pb{height:5px;border-radius:3px;background:#2a2a38;overflow:hidden;}.pf{height:100%;border-radius:3px;transition:width 0.4s;}
   .st{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.09em;color:#6b6b85;margin-bottom:9px;}
-  input,textarea,select{background:#12121a;border:0.5px solid #2a2a38;color:#e8e8f2;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-family:inherit;transition:border 0.15s;}
+  input:not([type="checkbox"]):not([type="radio"]),textarea,select{background:#12121a;border:0.5px solid #2a2a38;color:#e8e8f2;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-family:inherit;transition:border 0.15s;}
   input:focus,textarea:focus,select:focus{outline:none;border-color:#534AB7;}
   .ov{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:100;}
   .mod{background:#17171f;border-radius:14px;padding:1.5rem;width:90%;max-width:560px;border:0.5px solid #2a2a38;max-height:92vh;overflow-y:auto;}
