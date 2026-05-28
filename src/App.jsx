@@ -765,8 +765,7 @@ export default function App(){
               const buildOffline=()=>{
                 const notes=t.notes||"";if(notes.length<30)return;
                 const STOP=new Set(["a","o","e","é","de","do","da","em","um","uma","para","com","que","se","os","as","dos","das","no","na","por","mais","mas","ao","ou","não","já","isso","esse","esta","este","quando","sobre","após","entre","então","assim","muito","qual","cada","todo","toda","outros","podem","deve","pelo","pela","nos","nas","seu","sua","seus","suas","esse","essa","aquele","porque","como","onde","há","está","eram","será","foram","tinha","tem","este","estes","estas","esses","essas","ser","ter","foi","são","pelos","pelas","num","numa","também","ele","ela","eles","elas","seu","sua"]);
-                const sents=notes.split(/[.!?
-]+/).map(s=>s.trim()).filter(s=>s.length>25&&s.length<400);
+                const sents=notes.split(/[.!?\n]+/).map(s=>s.trim()).filter(s=>s.length>25&&s.length<400);
                 const wFreq={};
                 notes.toLowerCase().replace(/[^a-záàâãéèêíìîóòôõúùûç\s]/g," ").split(/\s+/).forEach(w=>{if(w.length>3&&!STOP.has(w))wFreq[w]=(wFreq[w]||0)+1;});
                 const topKw=Object.entries(wFreq).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([w])=>w);
