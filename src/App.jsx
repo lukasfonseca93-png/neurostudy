@@ -308,6 +308,9 @@ export default function App(){
   const [plannerTab,setPlannerTab]=useState("weekly");
   const [wInputs,setWInputs]=useState({});
   const [topicTab,setTopicTab]=useState({});
+  const [topicAI,setTopicAI]=useState({});
+  const [booksView,setBooksView]=useState("acervo");
+  const [readingPlan,setReadingPlan]=useState(()=>LS.get("readingPlan",{columns:["Neurociências","Ficção","Espiritual"],rows:{}}));
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
@@ -402,6 +405,7 @@ export default function App(){
           if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
           if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
           if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
+          if(st.data.reading_plan){setReadingPlan(st.data.reading_plan);LS.set("readingPlan",st.data.reading_plan);}
         }
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
@@ -436,6 +440,16 @@ export default function App(){
       sb.from('topics').update({fichamento:fich,updated_at:ts}).eq('id',id).catch(()=>{});
       return{...t,fichamento:fich,updated_at:ts};
     }));
+  },[]);
+
+  const genAIMindMap=useCallback(async(t)=>{
+    setTopicAI(p=>({...p,[t.id]:{loading:true,error:null}}));
+    try{
+      const resp=await fetch("/api/mindmap",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({notes:t.notes||"",title:t.title})});
+      const d=await resp.json();
+      if(!resp.ok)throw new Error(d.error||"Erro");
+      setTopicAI(p=>({...p,[t.id]:{loading:false,error:null,resumo:d.resumo,mapa:d.mapa}}));
+    }catch(e){setTopicAI(p=>({...p,[t.id]:{loading:false,error:e.message}}));}
   },[]);
 
   const deleteTopic=useCallback(async(id)=>{
@@ -538,6 +552,7 @@ export default function App(){
         folders:newFolders,
         week_study:newWeekStudy,
         weekly_schedule:newWeeklySchedule,
+        reading_plan:readingPlan,
         updated_at:new Date().toISOString()
       },{onConflict:'user_id'});}catch{}
     },1500);
@@ -668,11 +683,12 @@ export default function App(){
                 defaultValue={t.title}
                 onBlur={e=>{if(e.target.value!==t.title)saveTopicEdits(t.id,{title:e.target.value});}}/>
             </div>
-            <div style={{display:"flex",gap:5,padding:"8px 14px",borderBottom:`0.5px solid ${C.bord}`}}>
-              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"}].map(tab=>{
+            <div style={{display:"flex",gap:5,padding:"8px 14px",borderBottom:`0.5px solid ${C.bord}`,flexWrap:"wrap"}}>
+              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"},{id:"ia",icon:"ti-brain",l:"Visão IA"}].map(tab=>{
                 const active=(topicTab[t.id]||"notes")===tab.id;
+                const clr=tab.id==="ia"?"#34C98A":"#9D95E8";
                 return(<button key={tab.id} onClick={()=>setTopicTab(p=>({...p,[t.id]:tab.id}))}
-                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?"#3d3780":C.bord}`,background:active?"#1c1838":"transparent",color:active?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?(tab.id==="ia"?"#1D6B50":"#3d3780"):C.bord}`,background:active?(tab.id==="ia"?"#0d2218":"#1c1838"):"transparent",color:active?clr:C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
                   <i className={`ti ${tab.icon}`}/>{tab.l}
                 </button>);
               })}
@@ -742,6 +758,81 @@ export default function App(){
                 </div>
               </div>
             )}
+            {/* ── ABA VISÃO IA ── */}
+            {topicTab[t.id]==="ia"&&(()=>{
+              const ai=topicAI[t.id]||{};
+              const renderMapa=(mapa)=>{
+                if(!mapa?.ramos?.length)return null;
+                const W=680,H=460,cx=W/2,cy=H/2;
+                const ramos=mapa.ramos||[];const N=ramos.length;
+                const lines=[];
+                ramos.forEach((r,i)=>{
+                  const ang=(2*Math.PI/N*i)-Math.PI/2;
+                  const bx=cx+140*Math.cos(ang),by=cy+130*Math.sin(ang);
+                  lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#9D95E8"}" stroke-width="2.5" opacity="0.6"/>`);
+                  const tw=Math.min(120,Math.max(70,r.label.length*8));
+                  lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#9D95E8"}22" stroke="${r.cor||"#9D95E8"}" stroke-width="1.5"/>`);
+                  lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#9D95E8"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
+                  (r.filhos||[]).forEach((f,j)=>{
+                    const ns=r.filhos.length;const subAng=ang+(j-(ns-1)/2)*0.45;
+                    const sx=bx+95*Math.cos(subAng),sy=by+85*Math.sin(subAng);
+                    lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#9D95E8"}" stroke-width="1" opacity="0.35"/>`);
+                    const sw=Math.min(100,Math.max(50,f.length*7));
+                    lines.push(`<rect x="${sx-sw/2}" y="${sy-10}" width="${sw}" height="20" rx="5" fill="#12121a" stroke="#2a2a38" stroke-width="1"/>`);
+                    lines.push(`<text x="${sx}" y="${sy+4}" text-anchor="middle" fill="#a0a0b8" font-size="9.5" font-family="system-ui,sans-serif">${(f||"").substring(0,16)}</text>`);
+                  });
+                });
+                const ct=(mapa.centro||"").substring(0,22);const cw=Math.max(90,ct.length*9);
+                lines.push(`<ellipse cx="${cx}" cy="${cy}" rx="${cw/2+12}" ry="22" fill="#1c1838" stroke="#9D95E8" stroke-width="2"/>`);
+                lines.push(`<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#c8c4f8" font-size="12" font-weight="700" font-family="system-ui,sans-serif">${ct}</text>`);
+                return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:#0c0c10;border-radius:12px;border:0.5px solid #2a2a38;">${lines.join("")}</svg>`;
+              };
+              return(
+                <div style={{padding:"14px",background:"#0f0f13",display:"flex",flexDirection:"column",gap:12}}>
+                  {!ai.resumo&&!ai.loading&&(
+                    <div style={{textAlign:"center",padding:"2rem 1rem"}}>
+                      <div style={{fontSize:36,marginBottom:10}}>🧠</div>
+                      <p style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.6}}>Gere um resumo inteligente e mapa mental visual a partir das suas notas.</p>
+                      <button className="btn btng" onClick={()=>genAIMindMap(t)} style={{fontSize:13,padding:"9px 20px"}}>
+                        <i className="ti ti-wand"/>Gerar Resumo + Mapa Mental
+                      </button>
+                    </div>
+                  )}
+                  {ai.loading&&(
+                    <div style={{textAlign:"center",padding:"2rem",color:"#34C98A"}}>
+                      <i className="ti ti-loader-2" style={{fontSize:28,display:"block",marginBottom:8,animation:"spin 1s linear infinite"}}/>
+                      <span style={{fontSize:13}}>Analisando e gerando mapa mental...</span>
+                    </div>
+                  )}
+                  {ai.error&&(
+                    <div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#fca5a5"}}>
+                      ⚠️ {ai.error}
+                    </div>
+                  )}
+                  {ai.resumo&&(
+                    <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderLeft:"3px solid #34C98A",borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
+                      <div style={{fontSize:11,color:"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
+                        <i className="ti ti-sparkles"/>Resumo Gerado pela IA
+                      </div>
+                      <p style={{fontSize:13,color:C.text,lineHeight:1.8,margin:0}}>{ai.resumo}</p>
+                    </div>
+                  )}
+                  {ai.mapa&&(
+                    <div>
+                      <div style={{fontSize:11,color:"#9D95E8",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
+                        <i className="ti ti-hierarchy"/>Mapa Mental
+                      </div>
+                      <div dangerouslySetInnerHTML={{__html:renderMapa(ai.mapa)}}/>
+                    </div>
+                  )}
+                  {ai.resumo&&(
+                    <button className="btn btn-sm" style={{alignSelf:"flex-end",color:C.muted}} onClick={()=>genAIMindMap(t)}>
+                      <i className="ti ti-refresh"/>Regenerar
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -1272,10 +1363,88 @@ export default function App(){
               </ModalWrap>
             );
           };
+          const MONTHS_PT=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+          const curYear=new Date().getFullYear();
+          const allMonthKeys=MONTHS_PT.map((m,i)=>`${curYear}-${m}`);
+          const updatePlanCell=(rowKey,col,val)=>{
+            const nr={...readingPlan,rows:{...readingPlan.rows,[rowKey]:{...(readingPlan.rows[rowKey]||{}),[col]:val}}};
+            setReadingPlan(nr);
+            saveSettings(folders,weekStudy,weeklySchedule);
+          };
+          const addPlanCol=()=>{const name=prompt("Nome da categoria:");if(name?.trim()&&!readingPlan.columns.includes(name.trim()))setReadingPlan(p=>({...p,columns:[...p.columns,name.trim()]}));};
+          const removePlanCol=(col)=>{if(confirm(`Remover coluna "${col}"?`))setReadingPlan(p=>({...p,columns:p.columns.filter(c=>c!==col)}));};
+          const CAT_COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A","#F87171","#FB923C","#A78BFA"];
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
-              <PageHeader title="Livros" sub="Fichamento por capítulo — SQ4R" btn={{label:"Adicionar livro",icon:"ti-plus",fn:()=>setModal("book")}}/>
-              {["reading","queued","completed"].map(status=>{
+              <PageHeader title="Livros" sub={booksView==="acervo"?"Fichamento por capítulo — SQ4R":"Plano anual de leitura"} btn={{label:"Adicionar livro",icon:"ti-plus",fn:()=>setModal("book")}}/>
+              <div style={{display:"flex",gap:6}}>
+                {[{id:"acervo",icon:"ti-books",l:"Acervo"},{id:"plano",icon:"ti-calendar-month",l:"Plano de Leitura"}].map(v=>{
+                  const on=booksView===v.id;
+                  return(<button key={v.id} className={`atab${on?" on":""}`} style={on?{background:"#2d1a1a",color:"#fca5a5",borderColor:"#7f2020"}:{}} onClick={()=>setBooksView(v.id)}>
+                    <i className={`ti ${v.icon}`} style={{marginRight:4}}/>{v.l}
+                  </button>);
+                })}
+              </div>
+              {booksView==="plano"&&(
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                    <p style={{fontSize:13,color:C.muted}}>Planejamento mensal de leitura — edite cada célula livremente.</p>
+                    <button className="btn btn-sm btnp" onClick={addPlanCol}><i className="ti ti-plus"/>Nova categoria</button>
+                  </div>
+                  <div style={{overflowX:"auto",borderRadius:12,border:`0.5px solid ${C.bord}`}}>
+                    <table style={{minWidth:Math.max(600,(readingPlan.columns||[]).length*160+100)}}>
+                      <thead>
+                        <tr>
+                          <th style={{width:58,background:"#12121a",color:C.muted,textAlign:"center",padding:"10px 8px",fontWeight:600,fontSize:12,borderRight:`0.5px solid ${C.bord}`}}>Mês</th>
+                          {(readingPlan.columns||[]).map((col,ci)=>(
+                            <th key={col} style={{background:"#12121a",padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"space-between"}}>
+                                <span style={{color:CAT_COLORS[ci%CAT_COLORS.length],fontWeight:600,fontSize:13}}>{col}</span>
+                                <button onClick={()=>removePlanCol(col)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 2px"}}>×</button>
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allMonthKeys.map((mKey,mi)=>{
+                          const rowData=readingPlan.rows[mKey]||{};
+                          const isCurrentMonth=new Date().getMonth()===mi;
+                          return(
+                            <tr key={mKey} style={{background:isCurrentMonth?"#1a1830":"transparent"}}>
+                              <td style={{textAlign:"center",fontWeight:700,fontSize:13,color:isCurrentMonth?"#9D95E8":C.muted,padding:"6px 8px",borderRight:`0.5px solid ${C.bord}`,background:isCurrentMonth?"#1c1838":"#12121a",verticalAlign:"middle"}}>
+                                {MONTHS_PT[mi]}
+                              </td>
+                              {(readingPlan.columns||[]).map((col,ci)=>(
+                                <td key={col} style={{padding:4,verticalAlign:"top",borderLeft:mi===0?`0.5px solid ${C.bord}`:"none"}}>
+                                  <textarea
+                                    key={`rp-${mKey}-${col}`}
+                                    defaultValue={rowData[col]||""}
+                                    onBlur={e=>{if(e.target.value!==(rowData[col]||""))updatePlanCell(mKey,col,e.target.value);}}
+                                    placeholder="—"
+                                    rows={3}
+                                    style={{
+                                      width:"100%",minWidth:140,fontSize:12,lineHeight:1.6,
+                                      background:rowData[col]?"#17171f":"transparent",
+                                      border:`0.5px solid ${rowData[col]?CAT_COLORS[ci%CAT_COLORS.length]+"44":"transparent"}`,
+                                      borderRadius:6,padding:"6px 8px",color:C.text,resize:"none",
+                                      fontFamily:"inherit",outline:"none",transition:"border 0.15s",
+                                      borderLeft:rowData[col]?`2px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`:undefined
+                                    }}
+                                    onFocus={e=>{e.target.style.border=`0.5px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`;}}
+                                    onBlurCapture={e=>{if(!e.target.value)e.target.style.border="0.5px solid transparent";}}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {booksView==="acervo"&&["reading","queued","completed"].map(status=>{
                 const bks=books.filter(b=>b.status===status);if(!bks.length)return null;
                 const lbl={reading:"📖 Lendo agora",queued:"📚 Na fila",completed:"✅ Concluídos"};
                 return(
@@ -1310,6 +1479,7 @@ export default function App(){
                 );
               })}
               {books.length===0&&<div className="card" style={{textAlign:"center",padding:"2rem",color:C.muted}}><i className="ti ti-book-off" style={{fontSize:36,display:"block",marginBottom:8}}/><p>Nenhum livro ainda.</p><button className="btn btnp" style={{marginTop:12}} onClick={()=>setModal("book")}>Adicionar livro</button></div>}
+              }
               {expandedBook&&(()=>{const b=books.find(x=>x.id===expandedBook);return b?<BookDetailModal book={b} onClose={()=>setExpandedBook(null)}/>:null;})()}
             </div>
           );
