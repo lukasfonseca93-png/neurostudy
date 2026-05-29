@@ -310,7 +310,7 @@ export default function App(){
   const [topicTab,setTopicTab]=useState({});
   const [topicAI,setTopicAI]=useState({});
   const [booksView,setBooksView]=useState("acervo");
-  const [readingPlan,setReadingPlan]=useState(()=>LS.get("readingPlan",{columns:["Neurociências","Ficção","Espiritual"],rows:{}}));
+  const [readingPlan,setReadingPlan]=useState(()=>LS.get("readingPlan",{entries:[]}));
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
@@ -406,7 +406,7 @@ export default function App(){
           if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
           if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
           if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
-          {const rp=st.data.reading_plan;if(rp&&(rp.columns?.length>0||Object.keys(rp.rows||{}).length>0)){setReadingPlan(rp);LS.set("readingPlan",rp);}}
+          {const rp=st.data.reading_plan;if(rp&&(rp.entries?.length>0||(rp.columns?.length>0||Object.keys(rp.rows||{}).length>0))){const planData=rp.entries?rp:{entries:[]};setReadingPlan(planData);LS.set("readingPlan",planData);}}
         }
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
@@ -1394,17 +1394,30 @@ export default function App(){
           const MONTHS_PT=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
           const curYear=new Date().getFullYear();
           const allMonthKeys=MONTHS_PT.map((m,i)=>`${curYear}-${m}`);
-          const planCellTimers=useRef({});
-          const updatePlanCell=(rowKey,col,val)=>{
-            const nr={...readingPlan,rows:{...readingPlan.rows,[rowKey]:{...(readingPlan.rows[rowKey]||{}),[col]:val}}};
+          const CAT_COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A","#F87171","#FB923C","#A78BFA"];
+          const planEntries=readingPlan.entries||[];
+          const [planForm,setPlanForm]=useState(null);// null | {month, book, category, notes, editId}
+          const savePlanEntry=()=>{
+            if(!planForm?.book?.trim())return;
+            let entries;
+            if(planForm.editId){
+              entries=planEntries.map(e=>e.id===planForm.editId?{...e,book:planForm.book,category:planForm.category||"",notes:planForm.notes||""}:e);
+            }else{
+              entries=[...planEntries,{id:Date.now()+"",month:planForm.month,book:planForm.book.trim(),category:planForm.category||"",notes:planForm.notes||""}];
+            }
+            const nr={entries};
             LS.set("readingPlan",nr);
             setReadingPlan(nr);
-            clearTimeout(planCellTimers.current[rowKey+"_"+col]);
-            planCellTimers.current[rowKey+"_"+col]=setTimeout(()=>saveReadingPlan(nr),800);
+            saveReadingPlan(nr);
+            setPlanForm(null);
           };
-          const addPlanCol=()=>{const name=prompt("Nome da categoria:");if(name?.trim()&&!readingPlan.columns.includes(name.trim())){const nc={...readingPlan,columns:[...readingPlan.columns,name.trim()]};setReadingPlan(nc);saveReadingPlan(nc);}};
-          const removePlanCol=(col)=>{if(confirm(`Remover coluna "${col}"?`)){const nc={...readingPlan,columns:readingPlan.columns.filter(c=>c!==col)};setReadingPlan(nc);saveReadingPlan(nc);}};
-          const CAT_COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A","#F87171","#FB923C","#A78BFA"];
+          const deletePlanEntry=(id)=>{
+            const entries=planEntries.filter(e=>e.id!==id);
+            const nr={entries};
+            LS.set("readingPlan",nr);
+            setReadingPlan(nr);
+            saveReadingPlan(nr);
+          };
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Livros" sub={booksView==="acervo"?"Fichamento por capítulo — SQ4R":"Plano anual de leitura"} btn={{label:"Adicionar livro",icon:"ti-plus",fn:()=>setModal("book")}}/>
@@ -1417,62 +1430,75 @@ export default function App(){
                 })}
               </div>
               {booksView==="plano"&&(
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                    <p style={{fontSize:13,color:C.muted}}>Planejamento mensal de leitura — edite cada célula livremente.</p>
-                    <button className="btn btn-sm btnp" onClick={addPlanCol}><i className="ti ti-plus"/>Nova categoria</button>
-                  </div>
-                  <div style={{overflowX:"auto",borderRadius:12,border:`0.5px solid ${C.bord}`}}>
-                    <table style={{minWidth:Math.max(600,(readingPlan.columns||[]).length*160+100)}}>
-                      <thead>
-                        <tr>
-                          <th style={{width:58,background:"#12121a",color:C.muted,textAlign:"center",padding:"10px 8px",fontWeight:600,fontSize:12,borderRight:`0.5px solid ${C.bord}`}}>Mês</th>
-                          {(readingPlan.columns||[]).map((col,ci)=>(
-                            <th key={col} style={{background:"#12121a",padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"space-between"}}>
-                                <span style={{color:CAT_COLORS[ci%CAT_COLORS.length],fontWeight:600,fontSize:13}}>{col}</span>
-                                <button onClick={()=>removePlanCol(col)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 2px"}}>×</button>
-                              </div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allMonthKeys.map((mKey,mi)=>{
-                          const rowData=readingPlan.rows[mKey]||{};
-                          const isCurrentMonth=new Date().getMonth()===mi;
-                          return(
-                            <tr key={mKey} style={{background:isCurrentMonth?"#1a1830":"transparent"}}>
-                              <td style={{textAlign:"center",fontWeight:700,fontSize:13,color:isCurrentMonth?"#9D95E8":C.muted,padding:"6px 8px",borderRight:`0.5px solid ${C.bord}`,background:isCurrentMonth?"#1c1838":"#12121a",verticalAlign:"middle"}}>
-                                {MONTHS_PT[mi]}
-                              </td>
-                              {(readingPlan.columns||[]).map((col,ci)=>(
-                                <td key={col} style={{padding:4,verticalAlign:"top",borderLeft:mi===0?`0.5px solid ${C.bord}`:"none"}}>
-                                  <textarea
-                                    key={`rp-${mKey}-${col}`}
-                                    value={rowData[col]||""}
-                                    onChange={e=>updatePlanCell(mKey,col,e.target.value)}
-                                    placeholder="—"
-                                    rows={3}
-                                    style={{
-                                      width:"100%",minWidth:140,fontSize:12,lineHeight:1.6,
-                                      background:rowData[col]?"#17171f":"transparent",
-                                      border:`0.5px solid ${rowData[col]?CAT_COLORS[ci%CAT_COLORS.length]+"44":"transparent"}`,
-                                      borderRadius:6,padding:"6px 8px",color:C.text,resize:"none",
-                                      fontFamily:"inherit",outline:"none",transition:"border 0.15s",
-                                      borderLeft:rowData[col]?`2px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`:undefined
-                                    }}
-                                    onFocus={e=>{e.target.style.border=`0.5px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`;}}
-                                    onBlur={e=>{if(!e.target.value)e.target.style.border="0.5px solid transparent";}}
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                  <p style={{fontSize:13,color:C.muted,margin:0}}>Adicione livros por mês. Clique em <b style={{color:C.text}}>+ Adicionar</b> no mês desejado.</p>
+                  {planForm&&(
+                    <div style={{background:"#17171f",border:`1px solid #9D95E8`,borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+                      <div style={{fontWeight:700,fontSize:14,color:"#9D95E8",marginBottom:4}}>
+                        {planForm.editId?"Editar entrada":"Nova entrada"} — {MONTHS_PT[allMonthKeys.indexOf(planForm.month)]}
+                      </div>
+                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        <label style={{fontSize:12,color:C.muted}}>Livro *</label>
+                        <input value={planForm.book||""} onChange={e=>setPlanForm(f=>({...f,book:e.target.value}))} placeholder="Título do livro..." style={{fontSize:13}}/>
+                      </div>
+                      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                        <div style={{flex:1,minWidth:140,display:"flex",flexDirection:"column",gap:8}}>
+                          <label style={{fontSize:12,color:C.muted}}>Categoria</label>
+                          <input value={planForm.category||""} onChange={e=>setPlanForm(f=>({...f,category:e.target.value}))} placeholder="Ex: Neurociências, Ficção..." style={{fontSize:13}}/>
+                        </div>
+                        <div style={{flex:2,minWidth:180,display:"flex",flexDirection:"column",gap:8}}>
+                          <label style={{fontSize:12,color:C.muted}}>Observações</label>
+                          <input value={planForm.notes||""} onChange={e=>setPlanForm(f=>({...f,notes:e.target.value}))} placeholder="Meta de páginas, prioridade..." style={{fontSize:13}}/>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:8,marginTop:4}}>
+                        <button className="btn btnp" onClick={savePlanEntry} style={{flex:1,fontWeight:700}}><i className="ti ti-device-floppy"/>Salvar</button>
+                        <button className="btn" onClick={()=>setPlanForm(null)} style={{flex:1}}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                  {allMonthKeys.map((mKey,mi)=>{
+                    const monthEntries=planEntries.filter(e=>e.month===mKey);
+                    const isCurrentMonth=new Date().getMonth()===mi;
+                    const isAdding=planForm&&!planForm.editId&&planForm.month===mKey;
+                    return(
+                      <div key={mKey} style={{border:`0.5px solid ${isCurrentMonth?"#9D95E8":C.bord}`,borderRadius:12,overflow:"hidden"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:isCurrentMonth?"#1c1838":"#12121a"}}>
+                          <span style={{fontWeight:700,fontSize:14,color:isCurrentMonth?"#9D95E8":C.muted}}>
+                            {isCurrentMonth&&<span style={{fontSize:10,background:"#9D95E8",color:"#0f0f13",borderRadius:4,padding:"1px 5px",marginRight:6,fontWeight:600}}>ATUAL</span>}
+                            {MONTHS_PT[mi]} {curYear}
+                          </span>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:11,color:C.muted}}>{monthEntries.length} livro{monthEntries.length!==1?"s":""}</span>
+                            <button className="btn btn-sm btnp" onClick={()=>!isAdding&&setPlanForm({month:mKey,book:"",category:"",notes:""})}><i className="ti ti-plus"/>Adicionar</button>
+                          </div>
+                        </div>
+                        {monthEntries.length>0&&(
+                          <div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:6}}>
+                            {monthEntries.map((entry,ei)=>{
+                              const catColor=CAT_COLORS[ei%CAT_COLORS.length];
+                              return(
+                                <div key={entry.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"#17171f",borderRadius:8,borderLeft:`3px solid ${catColor}`}}>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{entry.book}</div>
+                                    <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
+                                      {entry.category&&<span style={{fontSize:11,color:catColor,background:catColor+"22",borderRadius:4,padding:"1px 7px"}}>{entry.category}</span>}
+                                      {entry.notes&&<span style={{fontSize:11,color:C.muted}}>{entry.notes}</span>}
+                                    </div>
+                                  </div>
+                                  <div style={{display:"flex",gap:4,flexShrink:0}}>
+                                    <button className="btn btn-sm" title="Editar" onClick={()=>setPlanForm({month:mKey,book:entry.book,category:entry.category||"",notes:entry.notes||"",editId:entry.id})}><i className="ti ti-pencil"/></button>
+                                    <button className="btn btn-sm btnr" title="Remover" onClick={()=>deletePlanEntry(entry.id)}><i className="ti ti-trash"/></button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {monthEntries.length===0&&<div style={{padding:"10px 16px",fontSize:12,color:C.muted,fontStyle:"italic"}}>Nenhum livro planejado para este mês.</div>}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {booksView==="acervo"&&["reading","queued","completed"].map(status=>{
