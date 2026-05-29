@@ -97,8 +97,8 @@ const CSS=`
   ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#0f0f13;}::-webkit-scrollbar-thumb{background:#2a2a38;border-radius:3px;}
   .sb{width:220px;background:#17171f;border-right:0.5px solid #2a2a38;padding:1rem 0.75rem;display:flex;flex-direction:column;gap:2px;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:10;}
   .main{margin-left:220px;padding:1.75rem;min-height:100vh;max-width:1300px;}
-  .ni{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;font-size:13px;color:#6b6b85;transition:all 0.15s;border:none;background:none;width:100%;text-align:left;}
-  .ni:hover{background:#1e1e28;color:#e8e8f2;}.ni.on{background:#1c1838;color:#9D95E8;font-weight:500;}.ni i{font-size:16px;}
+  .ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:14px;color:#8b8baa;transition:all 0.15s;border:none;background:none;width:100%;text-align:left;}
+  .ni:hover{background:#1e1e28;color:#e8e8f2;}.ni.on{background:#1c1838;color:#9D95E8;font-weight:600;}.ni i{font-size:17px;}
   .card{background:#1e1e28;border:0.5px solid #2a2a38;border-radius:12px;padding:1.2rem;}
   .met{background:#12121a;border:0.5px solid #2a2a38;border-radius:10px;padding:1rem;}
   .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
@@ -309,6 +309,11 @@ export default function App(){
   const [wInputs,setWInputs]=useState({});
   const [planEditCell,setPlanEditCell]=useState(null);
   const [planEditCat,setPlanEditCat]=useState(null);
+  const [dailyTasks,setDailyTasks]=useState(()=>LS.get("dailyTasks",[]));
+  const [dailyTaskInput,setDailyTaskInput]=useState("");
+  const [hoursView,setHoursView]=useState("week");// day|week|month|year
+  const [hoursLogs,setHoursLogs]=useState(()=>LS.get("hoursLogs",[]));// [{date:"2026-05-29",hours:2.5,category:"neuro"}]
+  const [hoursInput,setHoursInput]=useState({h:"",cat:"neuro"});
   const [topicTab,setTopicTab]=useState({});
   const [topicAI,setTopicAI]=useState({});
   const [booksView,setBooksView]=useState("acervo");
@@ -371,6 +376,8 @@ export default function App(){
     saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
   },[weekStudy,loaded]);
   useEffect(()=>{if(loaded)LS.set("readingPlan",readingPlan);},[readingPlan,loaded]);
+  useEffect(()=>{if(loaded)LS.set("dailyTasks",dailyTasks);},[dailyTasks,loaded]);
+  useEffect(()=>{if(loaded)LS.set("hoursLogs",hoursLogs);},[hoursLogs,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
@@ -414,6 +421,8 @@ export default function App(){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
           setPlanner(pm);LS.set("planner",pm);
         }
+        if(st.data?.hours_logs?.length>0){setHoursLogs(st.data.hours_logs);LS.set("hoursLogs",st.data.hours_logs);}
+        if(st.data?.daily_tasks?.length>0){setDailyTasks(st.data.daily_tasks);LS.set("dailyTasks",st.data.daily_tasks);}
         setSyncMsg("☁️ Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
       }catch{}
     })();
@@ -554,6 +563,18 @@ export default function App(){
       reading_plan:plan,
       updated_at:new Date().toISOString()
     },{onConflict:'user_id'});}catch(e){console.error('[saveReadingPlan]',e)}
+  },[session]);
+
+  const saveHoursLogs=useCallback(async(logs)=>{
+    LS.set("hoursLogs",logs);
+    if(!session?.user?.id)return;
+    try{await sb.from('user_settings').upsert({user_id:session.user.id,hours_logs:logs,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveHoursLogs]',e)}
+  },[session]);
+
+  const saveDailyTasks=useCallback(async(tasks)=>{
+    LS.set("dailyTasks",tasks);
+    if(!session?.user?.id)return;
+    try{await sb.from('user_settings').upsert({user_id:session.user.id,daily_tasks:tasks,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveDailyTasks]',e)}
   },[session]);
 
   const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule,newReadingPlan)=>{
@@ -944,6 +965,47 @@ export default function App(){
         {view==="dashboard"&&(()=>{
           const byArea=AREAS.map(a=>({...a,count:topics.filter(t=>t.area===a.id).length}));
           const totalWeekHrs=Object.values(weekStudy).reduce((a,b)=>a+b,0);
+          const todayStr=new Date().toISOString().slice(0,10);
+          // Daily tasks helpers
+          const addDTask=()=>{if(!dailyTaskInput.trim())return;const t={id:Date.now()+"",text:dailyTaskInput.trim(),done:false,date:todayStr};const nw=[...dailyTasks,t];setDailyTasks(nw);saveDailyTasks(nw);setDailyTaskInput("");};
+          const toggleDTask=(id)=>{const nw=dailyTasks.map(t=>t.id===id?{...t,done:!t.done}:t);setDailyTasks(nw);saveDailyTasks(nw);};
+          const delDTask=(id)=>{const nw=dailyTasks.filter(t=>t.id!==id);setDailyTasks(nw);saveDailyTasks(nw);};
+          const todayTasks=dailyTasks.filter(t=>t.date===todayStr);
+          const doneCnt=todayTasks.filter(t=>t.done).length;
+          // Hours tracker helpers
+          const addHoursLog=()=>{
+            const h=parseFloat(hoursInput.h);if(!h||h<=0)return;
+            const log={id:Date.now()+"",date:todayStr,hours:h,category:hoursInput.cat};
+            const nw=[...hoursLogs,log];setHoursLogs(nw);saveHoursLogs(nw);setHoursInput({h:"",cat:"neuro"});
+          };
+          const delHoursLog=(id)=>{const nw=hoursLogs.filter(l=>l.id!==id);setHoursLogs(nw);saveHoursLogs(nw);};
+          // Aggregation helpers
+          const fmt=(d)=>d.toISOString().slice(0,10);
+          const today=new Date();
+          const getLabel=(view,date)=>{
+            if(view==="day"){const d=new Date(date+"T12:00:00");return d.toLocaleDateString("pt-BR",{weekday:"short",day:"numeric",month:"short"});}
+            if(view==="week"){const d=new Date(date+"T12:00:00");return `${d.toLocaleDateString("pt-BR",{day:"numeric",month:"short"})}`;}
+            if(view==="month"){const[y,m]=date.split("-");const d=new Date(y,m-1,1);return d.toLocaleDateString("pt-BR",{month:"short",year:"2-digit"});}
+            return date;
+          };
+          let chartData=[];
+          if(hoursView==="day"){
+            // Last 14 days
+            for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const ds=fmt(d);const hrs=hoursLogs.filter(l=>l.date===ds).reduce((a,l)=>a+l.hours,0);chartData.push({label:getLabel("day",ds),hrs,date:ds,isToday:ds===todayStr});}
+          }else if(hoursView==="week"){
+            // Last 12 weeks
+            for(let i=11;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i*7);const wStart=new Date(d);wStart.setDate(wStart.getDate()-wStart.getDay()+1);const wEnd=new Date(wStart);wEnd.setDate(wEnd.getDate()+6);const dates=[];for(let j=0;j<7;j++){const dd=new Date(wStart);dd.setDate(dd.getDate()+j);dates.push(fmt(dd));}const hrs=hoursLogs.filter(l=>dates.includes(l.date)).reduce((a,l)=>a+l.hours,0);chartData.push({label:`${wStart.getDate()}/${wStart.getMonth()+1}`,hrs,isToday:dates.includes(todayStr)});}
+          }else if(hoursView==="month"){
+            // Last 12 months
+            for(let i=11;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth()-i,1);const prefix=fmt(d).slice(0,7);const hrs=hoursLogs.filter(l=>l.date.startsWith(prefix)).reduce((a,l)=>a+l.hours,0);const isCur=prefix===todayStr.slice(0,7);chartData.push({label:getLabel("month",prefix+"-01"),hrs,isToday:isCur});}
+          }else{
+            // Last 5 years
+            for(let i=4;i>=0;i--){const yr=(today.getFullYear()-i)+"";const hrs=hoursLogs.filter(l=>l.date.startsWith(yr)).reduce((a,l)=>a+l.hours,0);chartData.push({label:yr,hrs,isToday:yr===(today.getFullYear()+"")});}
+          }
+          const maxHrs=Math.max(1,...chartData.map(d=>d.hrs));
+          // Category breakdown for logs
+          const catBreakdown=AREAS.map(a=>({...a,hrs:hoursLogs.reduce((s,l)=>l.category===a.id?s+l.hours:s,0)})).filter(a=>a.hrs>0);
+          const totalLogHrs=catBreakdown.reduce((s,a)=>s+a.hrs,0);
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Dashboard" sub={`Hoje é ${new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})}`}/>
@@ -955,8 +1017,32 @@ export default function App(){
                   </div>
                 ))}
               </div>
+
+              {/* Tarefas diárias */}
               <div className="card">
-                <div className="st">Horas de estudo esta semana — edite diretamente</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div className="st" style={{margin:0}}>✅ Tarefas do dia — {new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"short"})}</div>
+                  {todayTasks.length>0&&<span style={{fontSize:12,color:doneCnt===todayTasks.length?"#34C98A":C.muted,fontWeight:600}}>{doneCnt}/{todayTasks.length} concluídas</span>}
+                </div>
+                {todayTasks.length===0&&<p style={{fontSize:13,color:C.muted,marginBottom:12,fontStyle:"italic"}}>Nenhuma tarefa ainda. Adicione sua primeira tarefa do dia!</p>}
+                {todayTasks.map(t=>(
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,background:t.done?"#1a1830":"#17171f",borderRadius:8,borderLeft:`3px solid ${t.done?"#9D95E8":C.bord}`,transition:"all 0.2s",cursor:"pointer"}} onClick={()=>toggleDTask(t.id)}>
+                    <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:`2px solid ${t.done?"#9D95E8":C.bord}`,background:t.done?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {t.done&&<i className="ti ti-check" style={{fontSize:12,color:"#0f0f13"}}/>}
+                    </div>
+                    <span style={{flex:1,fontSize:14,color:t.done?C.muted:C.text,textDecoration:t.done?"line-through":"none",fontWeight:t.done?400:500}}>{t.text}</span>
+                    <button onClick={e=>{e.stopPropagation();delDTask(t.id);}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,lineHeight:1,padding:"2px 4px"}}>×</button>
+                  </div>
+                ))}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <input value={dailyTaskInput} onChange={e=>setDailyTaskInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addDTask()} placeholder="Nova tarefa..." style={{flex:1,fontSize:14}}/>
+                  <button className="btn btnp" onClick={addDTask} style={{flexShrink:0}}><i className="ti ti-plus"/>Adicionar</button>
+                </div>
+              </div>
+
+              {/* Horas de estudo por categoria */}
+              <div className="card">
+                <div className="st">Horas de estudo esta semana — por categoria</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
                   {AREAS.map(a=>(
                     <div key={a.id} style={{textAlign:"center",background:a.bg,borderRadius:10,padding:"10px 6px",border:`0.5px solid ${a.color}33`}}>
@@ -975,6 +1061,65 @@ export default function App(){
                   </button>
                 </div>
               </div>
+
+              {/* Tracker de horas — estilo Forest */}
+              <div className="card">
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <div className="st" style={{margin:0}}>📊 Histórico de estudos</div>
+                  <div style={{display:"flex",gap:4}}>
+                    {[{k:"day",l:"Dias"},{k:"week",l:"Semanas"},{k:"month",l:"Meses"},{k:"year",l:"Anos"}].map(v=>(
+                      <button key={v.k} onClick={()=>setHoursView(v.k)} style={{padding:"4px 12px",borderRadius:20,border:`1px solid ${hoursView===v.k?"#9D95E8":C.bord}`,background:hoursView===v.k?"#1c1838":"transparent",color:hoursView===v.k?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:hoursView===v.k?700:400}}>{v.l}</button>
+                    ))}
+                  </div>
+                </div>
+                {/* Bar chart */}
+                <div style={{display:"flex",alignItems:"flex-end",gap:4,height:120,marginBottom:8,overflowX:"auto",paddingBottom:4}}>
+                  {chartData.map((d,i)=>(
+                    <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",flex:1,minWidth:hoursView==="day"?28:24,gap:3}}>
+                      <span style={{fontSize:9,color:d.hrs>0?"#9D95E8":C.muted,fontWeight:600}}>{d.hrs>0?d.hrs.toFixed(1):""}</span>
+                      <div style={{width:"100%",background:d.isToday?"#9D95E8":d.hrs>0?"#3d3780":"#1a1a28",borderRadius:"4px 4px 0 0",height:`${Math.max(4,(d.hrs/maxHrs)*90)}px`,transition:"height 0.3s",minHeight:4,position:"relative"}} title={`${d.label}: ${d.hrs.toFixed(1)}h`}/>
+                      <span style={{fontSize:9,color:d.isToday?"#9D95E8":C.muted,textAlign:"center",lineHeight:1.2,transform:"rotate(-30deg)",transformOrigin:"top center",whiteSpace:"nowrap"}}>{d.label}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Log entry */}
+                <div style={{borderTop:`0.5px solid ${C.bord}`,paddingTop:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:13,color:C.muted,fontWeight:500}}>Registrar hoje:</span>
+                  <input type="number" min="0.25" step="0.25" value={hoursInput.h} onChange={e=>setHoursInput(h=>({...h,h:e.target.value}))} placeholder="horas" style={{width:70,fontSize:13,textAlign:"center"}} onKeyDown={e=>e.key==="Enter"&&addHoursLog()}/>
+                  <select value={hoursInput.cat} onChange={e=>setHoursInput(h=>({...h,cat:e.target.value}))} style={{fontSize:13,padding:"5px 8px",background:"#17171f",border:`0.5px solid ${C.bord}`,borderRadius:6,color:C.text}}>
+                    {AREAS.map(a=><option key={a.id} value={a.id}>{a.label}</option>)}
+                  </select>
+                  <button className="btn btng" onClick={addHoursLog}><i className="ti ti-plus"/>Registrar</button>
+                </div>
+                {/* Recent logs */}
+                {hoursLogs.filter(l=>l.date===todayStr).length>0&&(
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:11,color:C.muted,marginBottom:4}}>Registros de hoje:</div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {hoursLogs.filter(l=>l.date===todayStr).map(l=>{const a=AREAS.find(x=>x.id===l.category);return(
+                        <span key={l.id} style={{fontSize:12,padding:"3px 10px",borderRadius:20,background:a?.bg||C.dim,color:a?.color||C.text,border:`0.5px solid ${a?.color||C.bord}`,display:"flex",alignItems:"center",gap:6}}>
+                          {a?.label||l.category}: {l.hours}h
+                          <button onClick={()=>delHoursLog(l.id)} style={{background:"none",border:"none",color:"inherit",cursor:"pointer",fontSize:12,lineHeight:1,opacity:0.6}}>×</button>
+                        </span>
+                      );})}
+                    </div>
+                  </div>
+                )}
+                {/* Category breakdown total */}
+                {catBreakdown.length>0&&(
+                  <div style={{marginTop:12,borderTop:`0.5px solid ${C.bord}`,paddingTop:10}}>
+                    <div style={{fontSize:11,color:C.muted,marginBottom:8}}>Total acumulado por categoria ({totalLogHrs.toFixed(1)}h)</div>
+                    {catBreakdown.map(a=>(
+                      <div key={a.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                        <span style={{fontSize:11,color:a.text,background:a.bg,padding:"1px 8px",borderRadius:20,minWidth:90,textAlign:"center"}}>{a.label}</span>
+                        <div style={{flex:1,height:6,background:C.dim,borderRadius:3,overflow:"hidden"}}><div style={{width:`${(a.hrs/totalLogHrs)*100}%`,height:"100%",background:a.color,borderRadius:3}}/></div>
+                        <span style={{fontSize:11,color:C.muted,minWidth:32,textAlign:"right"}}>{a.hrs.toFixed(1)}h</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div className="card">
                   <div className="st">Tópicos por área</div>
@@ -1646,40 +1791,48 @@ export default function App(){
               </div>
 
               {plannerTab==="weekly"&&(
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                    <span style={{fontSize:13,color:C.muted}}>Semana atual — organize o que vai estudar e marque o que concluiu</span>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:13,color:C.muted}}>Semana atual — organize seus estudos e marque o que concluiu</span>
                     <button className="btn btn-sm btnr" onClick={clearWeek}><i className="ti ti-trash" aria-hidden/>Limpar semana</button>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(120px,1fr))",gap:8,overflowX:"auto"}}>
-                    {WEEK_DAYS.map((day,idx)=>{
-                      const key=WEEK_KEYS[idx];
-                      const items=weeklySchedule[key]||[];
-                      const isToday=idx===activeDayIdx;
-                      const done=items.filter(i=>i.done).length;
-                      return(
-                        <div key={key} style={{background:isToday?"#1c1838":C.surf,border:`0.5px solid ${isToday?"#3d3780":C.bord}`,borderRadius:10,padding:"10px 8px",minWidth:120}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                            <span style={{fontSize:12,fontWeight:700,color:isToday?"#9D95E8":C.text}}>{day}</span>
-                            {items.length>0&&<span style={{fontSize:10,color:done===items.length?"#34C98A":C.muted}}>{done}/{items.length}</span>}
+                  {WEEK_DAYS.map((day,idx)=>{
+                    const key=WEEK_KEYS[idx];
+                    const items=weeklySchedule[key]||[];
+                    const isToday=idx===activeDayIdx;
+                    const done=items.filter(i=>i.done).length;
+                    return(
+                      <div key={key} style={{background:isToday?"#1c1838":"#12121a",border:`0.5px solid ${isToday?"#9D95E8":C.bord}`,borderRadius:12,overflow:"hidden"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:isToday?"#1e1c38":"#12121a"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            {isToday&&<span style={{fontSize:10,background:"#9D95E8",color:"#0f0f13",borderRadius:4,padding:"1px 6px",fontWeight:700}}>HOJE</span>}
+                            <span style={{fontWeight:700,fontSize:15,color:isToday?"#9D95E8":C.text}}>{day}</span>
                           </div>
-                          {items.map(item=>(
-                            <div key={item.id} style={{display:"flex",alignItems:"flex-start",gap:5,marginBottom:5,opacity:item.done?0.5:1}}>
-                              <input type="checkbox" checked={item.done} onChange={()=>toggleWeekItem(key,item.id)} style={{marginTop:2,accentColor:"#9D95E8",flexShrink:0}}/>
-                              <span style={{fontSize:12,flex:1,minWidth:0,lineHeight:1.5,textDecoration:item.done?"line-through":"none",color:item.done?C.muted:C.text,wordBreak:"break-word",overflowWrap:"break-word"}}>{item.text}</span>
-                              <button onClick={()=>delWeekItem(key,item.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,flexShrink:0,lineHeight:1}}>×</button>
-                            </div>
-                          ))}
-                          <div style={{marginTop:4}}>
-                            <input placeholder="+ adicionar..." value={wInputs[key]||""}
-                              onChange={e=>setWInputs(w=>({...w,[key]:e.target.value}))}
-                              onKeyDown={e=>{if(e.key==="Enter"&&(wInputs[key]||"").trim()){addWeekItem(key,wInputs[key]);setWInputs(w=>({...w,[key]:""}));}}}
-                              style={{fontSize:11,padding:"4px 6px",width:"100%",background:"transparent",border:"0.5px solid #2a2a38",borderRadius:5,color:C.text}}/>
-                          </div>
+                          <span style={{fontSize:12,color:done===items.length&&items.length>0?"#34C98A":C.muted,fontWeight:600}}>{items.length>0?`${done}/${items.length} feitas`:""}</span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        {items.length>0&&(
+                          <div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:4}}>
+                            {items.map(item=>(
+                              <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:item.done?"#1a1830":"#17171f",borderLeft:`3px solid ${item.done?"#9D95E8":C.bord}`,cursor:"pointer",transition:"all 0.15s"}} onClick={()=>toggleWeekItem(key,item.id)}>
+                                <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`2px solid ${item.done?"#9D95E8":C.bord}`,background:item.done?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {item.done&&<i className="ti ti-check" style={{fontSize:11,color:"#0f0f13"}}/>}
+                                </div>
+                                <span style={{flex:1,fontSize:14,lineHeight:1.5,color:item.done?C.muted:C.text,textDecoration:item.done?"line-through":"none",fontWeight:item.done?400:500,wordBreak:"break-word"}}>{item.text}</span>
+                                <button onClick={e=>{e.stopPropagation();delWeekItem(key,item.id);}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,flexShrink:0,lineHeight:1,padding:"2px 4px"}}>×</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{padding:"6px 12px 10px",display:"flex",gap:6}}>
+                          <input placeholder="+ Adicionar tarefa..." value={wInputs[key]||""}
+                            onChange={e=>setWInputs(w=>({...w,[key]:e.target.value}))}
+                            onKeyDown={e=>{if(e.key==="Enter"&&(wInputs[key]||"").trim()){addWeekItem(key,wInputs[key]);setWInputs(w=>({...w,[key]:""}));}}}
+                            style={{flex:1,fontSize:13,padding:"6px 10px",background:"transparent",border:`0.5px solid ${C.bord}`,borderRadius:8,color:C.text}}/>
+                          <button className="btn btn-sm btnp" onClick={()=>{if((wInputs[key]||"").trim()){addWeekItem(key,wInputs[key]);setWInputs(w=>({...w,[key]:""}));}}}>+</button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
