@@ -1394,30 +1394,36 @@ export default function App(){
           const MONTHS_PT=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
           const curYear=new Date().getFullYear();
           const allMonthKeys=MONTHS_PT.map((m,i)=>`${curYear}-${m}`);
-          const CAT_COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A","#F87171","#FB923C","#A78BFA"];
-          const planEntries=readingPlan.entries||[];
-          const [planForm,setPlanForm]=useState(null);// null | {month, book, category, notes, editId}
-          const savePlanEntry=()=>{
-            if(!planForm?.book?.trim())return;
-            let entries;
-            if(planForm.editId){
-              entries=planEntries.map(e=>e.id===planForm.editId?{...e,book:planForm.book,category:planForm.category||"",notes:planForm.notes||""}:e);
-            }else{
-              entries=[...planEntries,{id:Date.now()+"",month:planForm.month,book:planForm.book.trim(),category:planForm.category||"",notes:planForm.notes||""}];
-            }
-            const nr={entries};
-            LS.set("readingPlan",nr);
-            setReadingPlan(nr);
-            saveReadingPlan(nr);
-            setPlanForm(null);
+          const CAT_COLORS=["#9D95E8","#34C98A","#FBBF24","#60A5FA","#F87171","#FB923C","#A78BFA"];
+          const DEFAULT_TIPS=[
+            {id:"t1",title:"Crie um lugar fixo de leitura",desc:"O cérebro aprende por contexto. Uma cadeira, uma luz, um chá — sempre o mesmo. Em 2 semanas o corpo já entra em modo leitura ao sentar.",checked:false},
+            {id:"t2",title:"Âncora no tempo, não na duração",desc:'Em vez de "vou ler 30 min", defina "vou ler às 21h antes de dormir". A âncora temporal é mais robusta que metas de duração.',checked:false},
+            {id:"t3",title:"Mantenha as 3 trilhas separadas",desc:"Ficção à noite (lazer, não exige esforço cognitivo), espiritual em qualquer momento tranquilo, estudo nas sessões da semana. Cada livro no contexto certo.",checked:false},
+            {id:"t4",title:"Kindle longe do celular",desc:"A presença do smartphone na mesma mesa reduz a capacidade de concentração — mesmo sem usar. Deixe o celular em outro cômodo durante a leitura noturna.",checked:false},
+            {id:"t5",title:"Permissão para largar um livro",desc:"Se até a página 50 um livro de ficção não te prendeu, largue sem culpa. Ler um livro ruim até o fim é o maior assassino do hábito de leitura.",checked:false},
+            {id:"t6",title:"Uma frase por sessão de estudo",desc:"Ao terminar cada sessão, escreva UMA frase do que ficou. Sem pressão de resumo completo. Isso consolida a memória e dá sensação de progresso real.",checked:false},
+            {id:"t7",title:"Não quebre a corrente",desc:"Marque um X no Notion a cada semana que você leu — qualquer trilha, qualquer tempo. O objetivo é não ter dois X faltando seguidos. Progressão visual vicia.",checked:false},
+          ];
+          const planStats=readingPlan.stats||{livros:"",emAndamento:"",tempo:""};
+          const planCats=readingPlan.categories||[{name:"Neurociência",color:"#9D95E8"},{name:"Ficção",color:"#34C98A"},{name:"Espiritual",color:"#FBBF24"}];
+          const planSchedule=readingPlan.schedule||{};
+          const planMeta=readingPlan.meta||"";
+          const planTips=readingPlan.tips||DEFAULT_TIPS;
+          const [planEditCell,setPlanEditCell]=useState(null);// {month, cat, val}
+          const [planEditCat,setPlanEditCat]=useState(null);// index being renamed
+          const updatePlan=(patch)=>{const nr={...readingPlan,...patch};LS.set("readingPlan",nr);setReadingPlan(nr);saveReadingPlan(nr);};
+          const saveCell=()=>{
+            if(!planEditCell)return;
+            const sch={...planSchedule,[planEditCell.month]:{...(planSchedule[planEditCell.month]||{}),[planEditCell.cat]:planEditCell.val}};
+            updatePlan({schedule:sch});
+            setPlanEditCell(null);
           };
-          const deletePlanEntry=(id)=>{
-            const entries=planEntries.filter(e=>e.id!==id);
-            const nr={entries};
-            LS.set("readingPlan",nr);
-            setReadingPlan(nr);
-            saveReadingPlan(nr);
+          const toggleTip=(id)=>{
+            const tips=planTips.map(t=>t.id===id?{...t,checked:!t.checked}:t);
+            updatePlan({tips});
           };
+          const curMonthIdx=new Date().getMonth();
+          const scheduleMonths=allMonthKeys.slice(curMonthIdx);
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Livros" sub={booksView==="acervo"?"Fichamento por capítulo — SQ4R":"Plano anual de leitura"} btn={{label:"Adicionar livro",icon:"ti-plus",fn:()=>setModal("book")}}/>
@@ -1430,75 +1436,121 @@ export default function App(){
                 })}
               </div>
               {booksView==="plano"&&(
-                <div style={{display:"flex",flexDirection:"column",gap:16}}>
-                  <p style={{fontSize:13,color:C.muted,margin:0}}>Adicione livros por mês. Clique em <b style={{color:C.text}}>+ Adicionar</b> no mês desejado.</p>
-                  {planForm&&(
-                    <div style={{background:"#17171f",border:`1px solid #9D95E8`,borderRadius:12,padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-                      <div style={{fontWeight:700,fontSize:14,color:"#9D95E8",marginBottom:4}}>
-                        {planForm.editId?"Editar entrada":"Nova entrada"} — {MONTHS_PT[allMonthKeys.indexOf(planForm.month)]}
+                <div style={{display:"flex",flexDirection:"column",gap:20}}>
+                  {/* Stats */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+                    {[
+                      {key:"livros",label:"livros até dez",ph:"7"},
+                      {key:"emAndamento",label:"em andamento agora",ph:"3"},
+                      {key:"tempo",label:"leitura por semana",ph:"~2h"},
+                    ].map(s=>(
+                      <div key={s.key} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 10px",textAlign:"center"}}>
+                        <input
+                          defaultValue={planStats[s.key]||""}
+                          onBlur={e=>updatePlan({stats:{...planStats,[s.key]:e.target.value}})}
+                          placeholder={s.ph}
+                          style={{fontSize:26,fontWeight:800,color:C.text,textAlign:"center",background:"transparent",border:"none",outline:"none",width:"100%",padding:0,fontFamily:"inherit"}}
+                        />
+                        <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
                       </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        <label style={{fontSize:12,color:C.muted}}>Livro *</label>
-                        <input value={planForm.book||""} onChange={e=>setPlanForm(f=>({...f,book:e.target.value}))} placeholder="Título do livro..." style={{fontSize:13}}/>
-                      </div>
-                      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                        <div style={{flex:1,minWidth:140,display:"flex",flexDirection:"column",gap:8}}>
-                          <label style={{fontSize:12,color:C.muted}}>Categoria</label>
-                          <input value={planForm.category||""} onChange={e=>setPlanForm(f=>({...f,category:e.target.value}))} placeholder="Ex: Neurociências, Ficção..." style={{fontSize:13}}/>
-                        </div>
-                        <div style={{flex:2,minWidth:180,display:"flex",flexDirection:"column",gap:8}}>
-                          <label style={{fontSize:12,color:C.muted}}>Observações</label>
-                          <input value={planForm.notes||""} onChange={e=>setPlanForm(f=>({...f,notes:e.target.value}))} placeholder="Meta de páginas, prioridade..." style={{fontSize:13}}/>
-                        </div>
-                      </div>
-                      <div style={{display:"flex",gap:8,marginTop:4}}>
-                        <button className="btn btnp" onClick={savePlanEntry} style={{flex:1,fontWeight:700}}><i className="ti ti-device-floppy"/>Salvar</button>
-                        <button className="btn" onClick={()=>setPlanForm(null)} style={{flex:1}}>Cancelar</button>
-                      </div>
+                    ))}
+                  </div>
+                  {/* Cronograma */}
+                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"16px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                      <div style={{fontWeight:700,fontSize:15,color:C.text}}>Cronograma {MONTHS_PT[curMonthIdx]} — {MONTHS_PT[11]}</div>
+                      <button className="btn btn-sm btnp" onClick={()=>{const name=prompt("Nome da categoria:");if(name?.trim()){const cats=[...planCats,{name:name.trim(),color:CAT_COLORS[planCats.length%CAT_COLORS.length]}];updatePlan({categories:cats});}}}><i className="ti ti-plus"/>Categoria</button>
                     </div>
-                  )}
-                  {allMonthKeys.map((mKey,mi)=>{
-                    const monthEntries=planEntries.filter(e=>e.month===mKey);
-                    const isCurrentMonth=new Date().getMonth()===mi;
-                    const isAdding=planForm&&!planForm.editId&&planForm.month===mKey;
-                    return(
-                      <div key={mKey} style={{border:`0.5px solid ${isCurrentMonth?"#9D95E8":C.bord}`,borderRadius:12,overflow:"hidden"}}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:isCurrentMonth?"#1c1838":"#12121a"}}>
-                          <span style={{fontWeight:700,fontSize:14,color:isCurrentMonth?"#9D95E8":C.muted}}>
-                            {isCurrentMonth&&<span style={{fontSize:10,background:"#9D95E8",color:"#0f0f13",borderRadius:4,padding:"1px 5px",marginRight:6,fontWeight:600}}>ATUAL</span>}
-                            {MONTHS_PT[mi]} {curYear}
-                          </span>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:11,color:C.muted}}>{monthEntries.length} livro{monthEntries.length!==1?"s":""}</span>
-                            <button className="btn btn-sm btnp" onClick={()=>!isAdding&&setPlanForm({month:mKey,book:"",category:"",notes:""})}><i className="ti ti-plus"/>Adicionar</button>
-                          </div>
+                    {/* Legend */}
+                    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:12}}>
+                      {planCats.map((cat,ci)=>(
+                        <div key={ci} style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}>
+                          <span style={{width:10,height:10,borderRadius:"50%",background:cat.color,display:"inline-block",flexShrink:0}}/>
+                          <span style={{color:C.muted}}>{cat.name}</span>
+                          <button onClick={()=>{if(confirm(`Remover categoria "${cat.name}"?`)){updatePlan({categories:planCats.filter((_,i)=>i!==ci)});}}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,padding:"0 2px",lineHeight:1}}>×</button>
                         </div>
-                        {monthEntries.length>0&&(
-                          <div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:6}}>
-                            {monthEntries.map((entry,ei)=>{
-                              const catColor=CAT_COLORS[ei%CAT_COLORS.length];
-                              return(
-                                <div key={entry.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"#17171f",borderRadius:8,borderLeft:`3px solid ${catColor}`}}>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontWeight:600,fontSize:13,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{entry.book}</div>
-                                    <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
-                                      {entry.category&&<span style={{fontSize:11,color:catColor,background:catColor+"22",borderRadius:4,padding:"1px 7px"}}>{entry.category}</span>}
-                                      {entry.notes&&<span style={{fontSize:11,color:C.muted}}>{entry.notes}</span>}
-                                    </div>
-                                  </div>
-                                  <div style={{display:"flex",gap:4,flexShrink:0}}>
-                                    <button className="btn btn-sm" title="Editar" onClick={()=>setPlanForm({month:mKey,book:entry.book,category:entry.category||"",notes:entry.notes||"",editId:entry.id})}><i className="ti ti-pencil"/></button>
-                                    <button className="btn btn-sm btnr" title="Remover" onClick={()=>deletePlanEntry(entry.id)}><i className="ti ti-trash"/></button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {monthEntries.length===0&&<div style={{padding:"10px 16px",fontSize:12,color:C.muted,fontStyle:"italic"}}>Nenhum livro planejado para este mês.</div>}
+                      ))}
+                    </div>
+                    {/* Table */}
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{minWidth:Math.max(400,planCats.length*160+80),borderCollapse:"separate",borderSpacing:"0 4px"}}>
+                        <thead>
+                          <tr>
+                            <th style={{width:46,fontSize:11,color:C.muted,fontWeight:600,textAlign:"left",paddingBottom:8,paddingLeft:4}}/>
+                            {planCats.map((cat,ci)=>(
+                              <th key={ci} style={{fontSize:11,color:cat.color,fontWeight:700,textTransform:"uppercase",letterSpacing:1,paddingBottom:8,paddingLeft:6,textAlign:"left"}}>{cat.name}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {scheduleMonths.map((mKey,mi)=>{
+                            const mIdx=allMonthKeys.indexOf(mKey);
+                            const isCur=mIdx===curMonthIdx;
+                            const rowData=planSchedule[mKey]||{};
+                            return(
+                              <tr key={mKey} style={{background:isCur?"#1c183844":"transparent"}}>
+                                <td style={{fontSize:12,fontWeight:700,color:isCur?"#9D95E8":C.muted,padding:"4px 4px",verticalAlign:"middle",whiteSpace:"nowrap"}}>{MONTHS_PT[mIdx]}</td>
+                                {planCats.map((cat,ci)=>{
+                                  const val=rowData[cat.name]||"";
+                                  const isEditing=planEditCell&&planEditCell.month===mKey&&planEditCell.cat===cat.name;
+                                  return(
+                                    <td key={ci} style={{padding:"3px 6px",verticalAlign:"middle"}}>
+                                      {isEditing?(
+                                        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                                          <input autoFocus value={planEditCell.val} onChange={e=>setPlanEditCell(c=>({...c,val:e.target.value}))}
+                                            onKeyDown={e=>{if(e.key==="Enter")saveCell();if(e.key==="Escape")setPlanEditCell(null);}}
+                                            style={{fontSize:12,padding:"4px 8px",borderRadius:20,border:`1.5px solid ${cat.color}`,background:"#17171f",color:C.text,minWidth:100,outline:"none"}}/>
+                                          <button className="btn btn-sm btng" style={{padding:"3px 8px",fontSize:11}} onClick={saveCell}>Salvar</button>
+                                          <button className="btn btn-sm" style={{padding:"3px 8px",fontSize:11}} onClick={()=>setPlanEditCell(null)}>✕</button>
+                                        </div>
+                                      ):(
+                                        <div onClick={()=>setPlanEditCell({month:mKey,cat:cat.name,val})}
+                                          style={{display:"inline-flex",alignItems:"center",cursor:"pointer",padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:500,
+                                            background:val?cat.color+"22":"transparent",
+                                            border:`1px dashed ${val?cat.color:C.bord}`,
+                                            color:val?cat.color:C.muted,
+                                            minWidth:80,minHeight:28,
+                                            transition:"all 0.15s"}}>
+                                          {val||<span style={{fontSize:11,opacity:0.5}}>+ adicionar</span>}
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  {/* Meta */}
+                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 16px"}}>
+                    <div style={{fontSize:12,color:"#9D95E8",fontWeight:600,marginBottom:6}}>🎯 Meta anual</div>
+                    <textarea
+                      defaultValue={planMeta}
+                      onBlur={e=>updatePlan({meta:e.target.value})}
+                      placeholder="Meta final: 7 livros concluídos em 2026. Ritmo: 1 por trilha simultânea, sem pressão de data."
+                      rows={2}
+                      style={{fontSize:13,color:C.muted,background:"transparent",border:"none",outline:"none",resize:"none",width:"100%",fontFamily:"inherit",lineHeight:1.6,padding:0}}
+                    />
+                  </div>
+                  {/* Tips */}
+                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px",fontWeight:700,fontSize:14,color:C.text,borderBottom:`0.5px solid ${C.bord}`}}>Como pegar gosto pela leitura</div>
+                    {planTips.map((tip,ti)=>(
+                      <div key={tip.id} style={{display:"flex",gap:12,padding:"12px 16px",borderBottom:ti<planTips.length-1?`0.5px solid ${C.bord}`:"none",alignItems:"flex-start",cursor:"pointer",background:tip.checked?"#1a1830":"transparent"}}
+                        onClick={()=>toggleTip(tip.id)}>
+                        <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`1.5px solid ${tip.checked?"#9D95E8":C.bord}`,background:tip.checked?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>
+                          {tip.checked&&<i className="ti ti-check" style={{fontSize:11,color:"#0f0f13"}}/>}
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:600,fontSize:13,color:tip.checked?"#9D95E8":C.text,textDecoration:tip.checked?"line-through":"none"}}>{tip.title}</div>
+                          <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.5}}>{tip.desc}</div>
+                        </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               )}
               {booksView==="acervo"&&["reading","queued","completed"].map(status=>{
