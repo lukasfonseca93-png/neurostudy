@@ -318,7 +318,7 @@ export default function App(){
   const [topicAI,setTopicAI]=useState({});
   const [booksView,setBooksView]=useState("acervo");
   const [readingPlan,setReadingPlan]=useState(()=>LS.get("readingPlan",{entries:[]}));
-  const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
+  const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",["neuro","biblia","ingles","livros","geral"])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
   const [editNotes,setEditNotes]=useState({});
