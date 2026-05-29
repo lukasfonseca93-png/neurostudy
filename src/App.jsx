@@ -310,7 +310,7 @@ export default function App(){
   const [topicTab,setTopicTab]=useState({});
   const [topicAI,setTopicAI]=useState({});
   const [booksView,setBooksView]=useState("acervo");
-  const [readingPlan,setReadingPlan]=useState(()=>LS.get("readingPlan",{columns:["Neurociências","Ficção","Espiritual"],rows:{}}));
+  const [readingPlan,setReadingPlan]=useState(()=>LS.get("readingPlan",{entries:[]}));
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",[])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
@@ -351,7 +351,7 @@ export default function App(){
   useEffect(()=>{
     if(!loaded)return;
     LS.set("folders",folders);
-    saveSettings(folders,weekStudy,weeklySchedule);
+    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
   },[folders,loaded]);
   useEffect(()=>{if(loaded)LS.set("revRows",revRows);},[revRows,loaded]);
   useEffect(()=>{if(loaded)LS.set("books",books);},[books,loaded]);
@@ -361,13 +361,14 @@ export default function App(){
   useEffect(()=>{
     if(!loaded)return;
     LS.set("weeklySchedule",weeklySchedule);
-    saveSettings(folders,weekStudy,weeklySchedule);
+    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
   },[weeklySchedule,loaded]);
   useEffect(()=>{
     if(!loaded)return;
     LS.set("weekStudy",weekStudy);
-    saveSettings(folders,weekStudy,weeklySchedule);
+    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
   },[weekStudy,loaded]);
+  useEffect(()=>{if(loaded)LS.set("readingPlan",readingPlan);},[readingPlan,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
@@ -405,7 +406,7 @@ export default function App(){
           if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
           if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
           if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
-          if(st.data.reading_plan){setReadingPlan(st.data.reading_plan);LS.set("readingPlan",st.data.reading_plan);}
+          {const rp=st.data.reading_plan;if(rp&&(rp.entries?.length>0||(rp.columns?.length>0||Object.keys(rp.rows||{}).length>0))){const planData=rp.entries?rp:{entries:[]};setReadingPlan(planData);LS.set("readingPlan",planData);}}
         }
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
@@ -543,7 +544,17 @@ export default function App(){
     try{for(const id of ids)await sb.from('topics').update(changes).eq('id',id);}catch{}
   };;
 
-  const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule)=>{
+  const saveReadingPlan=useCallback(async(plan)=>{
+    if(!session?.user?.id)return;
+    LS.set("readingPlan",plan);
+    try{await sb.from('user_settings').upsert({
+      user_id:session.user.id,
+      reading_plan:plan,
+      updated_at:new Date().toISOString()
+    },{onConflict:'user_id'});}catch(e){console.error('[saveReadingPlan]',e)}
+  },[session]);
+
+  const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule,newReadingPlan)=>{
     if(!session?.user?.id)return;
     clearTimeout(settingsTimer.current);
     settingsTimer.current=setTimeout(async()=>{
@@ -552,9 +563,9 @@ export default function App(){
         folders:newFolders,
         week_study:newWeekStudy,
         weekly_schedule:newWeeklySchedule,
-        reading_plan:readingPlan,
+        reading_plan:newReadingPlan!==undefined?newReadingPlan:readingPlan,
         updated_at:new Date().toISOString()
-      },{onConflict:'user_id'});}catch{}
+      },{onConflict:'user_id'});}catch(e){console.error('[saveSettings]',e)}
     },1500);
   },[session]);
 
@@ -585,13 +596,13 @@ export default function App(){
     try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
   },[t0,revRows]);
 
-  const updateBook=useCallback(async(id,changes)=>{setBooks(p=>p.map(b=>b.id===id?{...b,...changes}:b));try{await sb.from('books').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);}catch{}},[]);
+  const updateBook=useCallback(async(id,changes)=>{setBooks(p=>p.map(b=>b.id===id?{...b,...changes}:b));try{await sb.from('books').update({...changes,updated_at:new Date().toISOString()}).eq('id',id);}catch(e){console.error('[updateBook]',e)}},[]);
   const addBook=useCallback(async()=>{const id=Date.now();const book={id,title:nb.title,author:nb.author,area:nb.area,status:nb.status,progress:0,notes:nb.notes,chapters:[],user_id:session?.user?.id||null};setBooks(p=>[...p,book]);setModal(null);setNb({title:"",author:"",area:"livros",status:"queued",notes:""});try{await sb.from('books').upsert({...book,updated_at:new Date().toISOString()});}catch{}},[nb]);
   const deleteBook=useCallback(async(id)=>{if(!confirm("Excluir livro?"))return;setBooks(p=>p.filter(b=>b.id!==id));try{await sb.from('books').delete().eq('id',id);}catch{}},[]);
-  const addChapter=useCallback(async(bId,title)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=[...(book.chapters||[]),{id:Date.now(),title,resumo:"",perguntas:"",insights:"",created_at:Date.now()}];setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const updateChapter=useCallback(async(bId,chId,changes)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,...changes}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const deleteChapter=useCallback(async(bId,chId)=>{if(!confirm("Excluir capítulo?"))return;const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).filter(c=>c.id!==chId);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
-  const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch{}},[books]);
+  const addChapter=useCallback(async(bId,title)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=[...(book.chapters||[]),{id:Date.now(),title,resumo:"",perguntas:"",insights:"",created_at:Date.now()}];setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
+  const updateChapter=useCallback(async(bId,chId,changes)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,...changes}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
+  const deleteChapter=useCallback(async(bId,chId)=>{if(!confirm("Excluir capítulo?"))return;const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).filter(c=>c.id!==chId);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
+  const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
   const addChapterToReview=useCallback(async(book,ch)=>{
     const id="ch_"+ch.id;if(revRows.find(r=>r.id===id)){alert("Capítulo já está na revisão.");return;}
     const catLabel=AREAS.find(a=>a.id===book.area)?.label||"Geral";
@@ -1363,7 +1374,7 @@ export default function App(){
                                 rows={Math.max(3,(vals[f.k]||"").split("\n").length+1)}
                                 placeholder={f.ph}
                                 defaultValue={vals[f.k]||""}
-                                onBlur={e=>setChChanges(c=>({...c,[ch.id]:{...vals,[f.k]:e.target.value}}))}
+                                onBlur={e=>{const updated={...vals,[f.k]:e.target.value};setChChanges(c=>({...c,[ch.id]:updated}));updateChapter(bookData.id,ch.id,updated);}}
                                 style={{fontSize:13,resize:"vertical",lineHeight:1.8,background:"transparent",border:"none",padding:0,color:C.text,width:"100%",outline:"none",fontFamily:"inherit"}}/>
                             </div>
                           ))}
@@ -1383,14 +1394,36 @@ export default function App(){
           const MONTHS_PT=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
           const curYear=new Date().getFullYear();
           const allMonthKeys=MONTHS_PT.map((m,i)=>`${curYear}-${m}`);
-          const updatePlanCell=(rowKey,col,val)=>{
-            const nr={...readingPlan,rows:{...readingPlan.rows,[rowKey]:{...(readingPlan.rows[rowKey]||{}),[col]:val}}};
-            setReadingPlan(nr);
-            saveSettings(folders,weekStudy,weeklySchedule);
+          const CAT_COLORS=["#9D95E8","#34C98A","#FBBF24","#60A5FA","#F87171","#FB923C","#A78BFA"];
+          const DEFAULT_TIPS=[
+            {id:"t1",title:"Crie um lugar fixo de leitura",desc:"O cérebro aprende por contexto. Uma cadeira, uma luz, um chá — sempre o mesmo. Em 2 semanas o corpo já entra em modo leitura ao sentar.",checked:false},
+            {id:"t2",title:"Âncora no tempo, não na duração",desc:'Em vez de "vou ler 30 min", defina "vou ler às 21h antes de dormir". A âncora temporal é mais robusta que metas de duração.',checked:false},
+            {id:"t3",title:"Mantenha as 3 trilhas separadas",desc:"Ficção à noite (lazer, não exige esforço cognitivo), espiritual em qualquer momento tranquilo, estudo nas sessões da semana. Cada livro no contexto certo.",checked:false},
+            {id:"t4",title:"Kindle longe do celular",desc:"A presença do smartphone na mesma mesa reduz a capacidade de concentração — mesmo sem usar. Deixe o celular em outro cômodo durante a leitura noturna.",checked:false},
+            {id:"t5",title:"Permissão para largar um livro",desc:"Se até a página 50 um livro de ficção não te prendeu, largue sem culpa. Ler um livro ruim até o fim é o maior assassino do hábito de leitura.",checked:false},
+            {id:"t6",title:"Uma frase por sessão de estudo",desc:"Ao terminar cada sessão, escreva UMA frase do que ficou. Sem pressão de resumo completo. Isso consolida a memória e dá sensação de progresso real.",checked:false},
+            {id:"t7",title:"Não quebre a corrente",desc:"Marque um X no Notion a cada semana que você leu — qualquer trilha, qualquer tempo. O objetivo é não ter dois X faltando seguidos. Progressão visual vicia.",checked:false},
+          ];
+          const planStats=readingPlan.stats||{livros:"",emAndamento:"",tempo:""};
+          const planCats=readingPlan.categories||[{name:"Neurociência",color:"#9D95E8"},{name:"Ficção",color:"#34C98A"},{name:"Espiritual",color:"#FBBF24"}];
+          const planSchedule=readingPlan.schedule||{};
+          const planMeta=readingPlan.meta||"";
+          const planTips=readingPlan.tips||DEFAULT_TIPS;
+          const [planEditCell,setPlanEditCell]=useState(null);// {month, cat, val}
+          const [planEditCat,setPlanEditCat]=useState(null);// index being renamed
+          const updatePlan=(patch)=>{const nr={...readingPlan,...patch};LS.set("readingPlan",nr);setReadingPlan(nr);saveReadingPlan(nr);};
+          const saveCell=()=>{
+            if(!planEditCell)return;
+            const sch={...planSchedule,[planEditCell.month]:{...(planSchedule[planEditCell.month]||{}),[planEditCell.cat]:planEditCell.val}};
+            updatePlan({schedule:sch});
+            setPlanEditCell(null);
           };
-          const addPlanCol=()=>{const name=prompt("Nome da categoria:");if(name?.trim()&&!readingPlan.columns.includes(name.trim()))setReadingPlan(p=>({...p,columns:[...p.columns,name.trim()]}));};
-          const removePlanCol=(col)=>{if(confirm(`Remover coluna "${col}"?`))setReadingPlan(p=>({...p,columns:p.columns.filter(c=>c!==col)}));};
-          const CAT_COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A","#F87171","#FB923C","#A78BFA"];
+          const toggleTip=(id)=>{
+            const tips=planTips.map(t=>t.id===id?{...t,checked:!t.checked}:t);
+            updatePlan({tips});
+          };
+          const curMonthIdx=new Date().getMonth();
+          const scheduleMonths=allMonthKeys.slice(curMonthIdx);
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Livros" sub={booksView==="acervo"?"Fichamento por capítulo — SQ4R":"Plano anual de leitura"} btn={{label:"Adicionar livro",icon:"ti-plus",fn:()=>setModal("book")}}/>
@@ -1403,61 +1436,120 @@ export default function App(){
                 })}
               </div>
               {booksView==="plano"&&(
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                    <p style={{fontSize:13,color:C.muted}}>Planejamento mensal de leitura — edite cada célula livremente.</p>
-                    <button className="btn btn-sm btnp" onClick={addPlanCol}><i className="ti ti-plus"/>Nova categoria</button>
+                <div style={{display:"flex",flexDirection:"column",gap:20}}>
+                  {/* Stats */}
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+                    {[
+                      {key:"livros",label:"livros até dez",ph:"7"},
+                      {key:"emAndamento",label:"em andamento agora",ph:"3"},
+                      {key:"tempo",label:"leitura por semana",ph:"~2h"},
+                    ].map(s=>(
+                      <div key={s.key} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 10px",textAlign:"center"}}>
+                        <input
+                          defaultValue={planStats[s.key]||""}
+                          onBlur={e=>updatePlan({stats:{...planStats,[s.key]:e.target.value}})}
+                          placeholder={s.ph}
+                          style={{fontSize:26,fontWeight:800,color:C.text,textAlign:"center",background:"transparent",border:"none",outline:"none",width:"100%",padding:0,fontFamily:"inherit"}}
+                        />
+                        <div style={{fontSize:11,color:C.muted,marginTop:2}}>{s.label}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{overflowX:"auto",borderRadius:12,border:`0.5px solid ${C.bord}`}}>
-                    <table style={{minWidth:Math.max(600,(readingPlan.columns||[]).length*160+100)}}>
-                      <thead>
-                        <tr>
-                          <th style={{width:58,background:"#12121a",color:C.muted,textAlign:"center",padding:"10px 8px",fontWeight:600,fontSize:12,borderRight:`0.5px solid ${C.bord}`}}>Mês</th>
-                          {(readingPlan.columns||[]).map((col,ci)=>(
-                            <th key={col} style={{background:"#12121a",padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"space-between"}}>
-                                <span style={{color:CAT_COLORS[ci%CAT_COLORS.length],fontWeight:600,fontSize:13}}>{col}</span>
-                                <button onClick={()=>removePlanCol(col)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,lineHeight:1,padding:"0 2px"}}>×</button>
-                              </div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allMonthKeys.map((mKey,mi)=>{
-                          const rowData=readingPlan.rows[mKey]||{};
-                          const isCurrentMonth=new Date().getMonth()===mi;
-                          return(
-                            <tr key={mKey} style={{background:isCurrentMonth?"#1a1830":"transparent"}}>
-                              <td style={{textAlign:"center",fontWeight:700,fontSize:13,color:isCurrentMonth?"#9D95E8":C.muted,padding:"6px 8px",borderRight:`0.5px solid ${C.bord}`,background:isCurrentMonth?"#1c1838":"#12121a",verticalAlign:"middle"}}>
-                                {MONTHS_PT[mi]}
-                              </td>
-                              {(readingPlan.columns||[]).map((col,ci)=>(
-                                <td key={col} style={{padding:4,verticalAlign:"top",borderLeft:mi===0?`0.5px solid ${C.bord}`:"none"}}>
-                                  <textarea
-                                    key={`rp-${mKey}-${col}`}
-                                    defaultValue={rowData[col]||""}
-                                    onBlur={e=>{if(e.target.value!==(rowData[col]||""))updatePlanCell(mKey,col,e.target.value);}}
-                                    placeholder="—"
-                                    rows={3}
-                                    style={{
-                                      width:"100%",minWidth:140,fontSize:12,lineHeight:1.6,
-                                      background:rowData[col]?"#17171f":"transparent",
-                                      border:`0.5px solid ${rowData[col]?CAT_COLORS[ci%CAT_COLORS.length]+"44":"transparent"}`,
-                                      borderRadius:6,padding:"6px 8px",color:C.text,resize:"none",
-                                      fontFamily:"inherit",outline:"none",transition:"border 0.15s",
-                                      borderLeft:rowData[col]?`2px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`:undefined
-                                    }}
-                                    onFocus={e=>{e.target.style.border=`0.5px solid ${CAT_COLORS[ci%CAT_COLORS.length]}`;}}
-                                    onBlurCapture={e=>{if(!e.target.value)e.target.style.border="0.5px solid transparent";}}
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  {/* Cronograma */}
+                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"16px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                      <div style={{fontWeight:700,fontSize:15,color:C.text}}>Cronograma {MONTHS_PT[curMonthIdx]} — {MONTHS_PT[11]}</div>
+                      <button className="btn btn-sm btnp" onClick={()=>{const name=prompt("Nome da categoria:");if(name?.trim()){const cats=[...planCats,{name:name.trim(),color:CAT_COLORS[planCats.length%CAT_COLORS.length]}];updatePlan({categories:cats});}}}><i className="ti ti-plus"/>Categoria</button>
+                    </div>
+                    {/* Legend */}
+                    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:12}}>
+                      {planCats.map((cat,ci)=>(
+                        <div key={ci} style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}>
+                          <span style={{width:10,height:10,borderRadius:"50%",background:cat.color,display:"inline-block",flexShrink:0}}/>
+                          <span style={{color:C.muted}}>{cat.name}</span>
+                          <button onClick={()=>{if(confirm(`Remover categoria "${cat.name}"?`)){updatePlan({categories:planCats.filter((_,i)=>i!==ci)});}}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,padding:"0 2px",lineHeight:1}}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Table */}
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{minWidth:Math.max(400,planCats.length*160+80),borderCollapse:"separate",borderSpacing:"0 4px"}}>
+                        <thead>
+                          <tr>
+                            <th style={{width:46,fontSize:11,color:C.muted,fontWeight:600,textAlign:"left",paddingBottom:8,paddingLeft:4}}/>
+                            {planCats.map((cat,ci)=>(
+                              <th key={ci} style={{fontSize:11,color:cat.color,fontWeight:700,textTransform:"uppercase",letterSpacing:1,paddingBottom:8,paddingLeft:6,textAlign:"left"}}>{cat.name}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {scheduleMonths.map((mKey,mi)=>{
+                            const mIdx=allMonthKeys.indexOf(mKey);
+                            const isCur=mIdx===curMonthIdx;
+                            const rowData=planSchedule[mKey]||{};
+                            return(
+                              <tr key={mKey} style={{background:isCur?"#1c183844":"transparent"}}>
+                                <td style={{fontSize:12,fontWeight:700,color:isCur?"#9D95E8":C.muted,padding:"4px 4px",verticalAlign:"middle",whiteSpace:"nowrap"}}>{MONTHS_PT[mIdx]}</td>
+                                {planCats.map((cat,ci)=>{
+                                  const val=rowData[cat.name]||"";
+                                  const isEditing=planEditCell&&planEditCell.month===mKey&&planEditCell.cat===cat.name;
+                                  return(
+                                    <td key={ci} style={{padding:"3px 6px",verticalAlign:"middle"}}>
+                                      {isEditing?(
+                                        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                                          <input autoFocus value={planEditCell.val} onChange={e=>setPlanEditCell(c=>({...c,val:e.target.value}))}
+                                            onKeyDown={e=>{if(e.key==="Enter")saveCell();if(e.key==="Escape")setPlanEditCell(null);}}
+                                            style={{fontSize:12,padding:"4px 8px",borderRadius:20,border:`1.5px solid ${cat.color}`,background:"#17171f",color:C.text,minWidth:100,outline:"none"}}/>
+                                          <button className="btn btn-sm btng" style={{padding:"3px 8px",fontSize:11}} onClick={saveCell}>Salvar</button>
+                                          <button className="btn btn-sm" style={{padding:"3px 8px",fontSize:11}} onClick={()=>setPlanEditCell(null)}>✕</button>
+                                        </div>
+                                      ):(
+                                        <div onClick={()=>setPlanEditCell({month:mKey,cat:cat.name,val})}
+                                          style={{display:"inline-flex",alignItems:"center",cursor:"pointer",padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:500,
+                                            background:val?cat.color+"22":"transparent",
+                                            border:`1px dashed ${val?cat.color:C.bord}`,
+                                            color:val?cat.color:C.muted,
+                                            minWidth:80,minHeight:28,
+                                            transition:"all 0.15s"}}>
+                                          {val||<span style={{fontSize:11,opacity:0.5}}>+ adicionar</span>}
+                                        </div>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  {/* Meta */}
+                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 16px"}}>
+                    <div style={{fontSize:12,color:"#9D95E8",fontWeight:600,marginBottom:6}}>🎯 Meta anual</div>
+                    <textarea
+                      defaultValue={planMeta}
+                      onBlur={e=>updatePlan({meta:e.target.value})}
+                      placeholder="Meta final: 7 livros concluídos em 2026. Ritmo: 1 por trilha simultânea, sem pressão de data."
+                      rows={2}
+                      style={{fontSize:13,color:C.muted,background:"transparent",border:"none",outline:"none",resize:"none",width:"100%",fontFamily:"inherit",lineHeight:1.6,padding:0}}
+                    />
+                  </div>
+                  {/* Tips */}
+                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px",fontWeight:700,fontSize:14,color:C.text,borderBottom:`0.5px solid ${C.bord}`}}>Como pegar gosto pela leitura</div>
+                    {planTips.map((tip,ti)=>(
+                      <div key={tip.id} style={{display:"flex",gap:12,padding:"12px 16px",borderBottom:ti<planTips.length-1?`0.5px solid ${C.bord}`:"none",alignItems:"flex-start",cursor:"pointer",background:tip.checked?"#1a1830":"transparent"}}
+                        onClick={()=>toggleTip(tip.id)}>
+                        <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`1.5px solid ${tip.checked?"#9D95E8":C.bord}`,background:tip.checked?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>
+                          {tip.checked&&<i className="ti ti-check" style={{fontSize:11,color:"#0f0f13"}}/>}
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontWeight:600,fontSize:13,color:tip.checked?"#9D95E8":C.text,textDecoration:tip.checked?"line-through":"none"}}>{tip.title}</div>
+                          <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.5}}>{tip.desc}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
