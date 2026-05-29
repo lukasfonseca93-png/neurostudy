@@ -408,7 +408,7 @@ export default function App(){
           if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
           if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
           if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
-          {const rp=st.data.reading_plan;if(rp&&(rp.entries?.length>0||(rp.columns?.length>0||Object.keys(rp.rows||{}).length>0))){const planData=rp.entries?rp:{entries:[]};setReadingPlan(planData);LS.set("readingPlan",planData);}}
+          {const rp=st.data.reading_plan;if(rp&&Object.keys(rp).length>0&&(rp.stats||rp.categories||rp.schedule||rp.tips||rp.meta!=null||rp.entries?.length>0||rp.columns?.length>0||Object.keys(rp.rows||{}).length>0)){setReadingPlan(rp);LS.set("readingPlan",rp);}}
         }
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
