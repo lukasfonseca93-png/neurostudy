@@ -307,6 +307,8 @@ export default function App(){
   const [weeklySchedule,setWeeklySchedule]=useState(()=>LS.get("weeklySchedule",{}));
   const [plannerTab,setPlannerTab]=useState("weekly");
   const [wInputs,setWInputs]=useState({});
+  const [planEditCell,setPlanEditCell]=useState(null);
+  const [planEditCat,setPlanEditCat]=useState(null);
   const [topicTab,setTopicTab]=useState({});
   const [topicAI,setTopicAI]=useState({});
   const [booksView,setBooksView]=useState("acervo");
@@ -1409,8 +1411,6 @@ export default function App(){
           const planSchedule=readingPlan.schedule||{};
           const planMeta=readingPlan.meta||"";
           const planTips=readingPlan.tips||DEFAULT_TIPS;
-          const [planEditCell,setPlanEditCell]=useState(null);// {month, cat, val}
-          const [planEditCat,setPlanEditCat]=useState(null);// index being renamed
           const updatePlan=(patch)=>{const nr={...readingPlan,...patch};LS.set("readingPlan",nr);setReadingPlan(nr);saveReadingPlan(nr);};
           const saveCell=()=>{
             if(!planEditCell)return;
