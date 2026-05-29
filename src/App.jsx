@@ -1588,7 +1588,6 @@ export default function App(){
                 );
               })}
               {books.length===0&&<div className="card" style={{textAlign:"center",padding:"2rem",color:C.muted}}><i className="ti ti-book-off" style={{fontSize:36,display:"block",marginBottom:8}}/><p>Nenhum livro ainda.</p><button className="btn btnp" style={{marginTop:12}} onClick={()=>setModal("book")}>Adicionar livro</button></div>}
-              }
               {expandedBook&&(()=>{const b=books.find(x=>x.id===expandedBook);return b?<BookDetailModal book={b} onClose={()=>setExpandedBook(null)}/>:null;})()}
             </div>
           );
