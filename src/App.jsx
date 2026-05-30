@@ -354,7 +354,9 @@ export default function App(){
   const [ng,setNg]=useState({area:"neuro",title:"",target:"",unit:"",period:"anual"});
   const [nr,setNr]=useState({topic:"",cat:"Neuro",base_date:today()});
   const t0=today();
-  const [ult,setUlt]=useState(null); // {mode:'focus'|'break',secs,running}
+  const [ult,setUlt]=useState(null); // {mode:'focus'|'break',secs,running,focusMins,breakMins}
+  const [ultFocusMins,setUltFocusMins]=useState(()=>LS.get("ultFocusMins",90));
+  const [ultBreakMins,setUltBreakMins]=useState(()=>LS.get("ultBreakMins",20));
   const ultRef=useRef(null);
   const foldersTimer=useRef(null);
   const weekStudyTimer=useRef(null);
@@ -395,9 +397,20 @@ export default function App(){
       setUlt(u=>{
         if(!u||!u.running)return u;
         if(u.secs<=1){
-          const next=u.mode==='focus'?{mode:'break',secs:20*60,running:true}:{mode:'focus',secs:90*60,running:true};
-          try{new Notification(next.mode==='break'?"⏰ Pausa! 20 min de descanso":"🧠 Hora de focar! 90 min de estudo");}catch{}
-          return next;
+          const focusSecs=(u.focusMins||ultFocusMins)*60;
+          const breakSecs=(u.breakMins||ultBreakMins)*60;
+          if(u.mode==='focus'){
+            // Ciclo de foco completado — salva como log de horas
+            const hrs=parseFloat(((u.focusMins||ultFocusMins)/60).toFixed(2));
+            const log={id:Date.now()+"_ult",date:new Date().toISOString().slice(0,10),hours:hrs,category:"geral"};
+            setHoursLogs(prev=>{const nw=[...prev,log];LS.set("hoursLogs",nw);return nw;});
+            try{if(session?.user?.id)sb.from('hours_logs').insert({id:log.id,user_id:session.user.id,date:log.date,hours:log.hours,category:log.category}).then();}catch{}
+            try{new Notification("🌿 Pausa! "+u.breakMins+" min de descanso");}catch{}
+            return{...u,mode:'break',secs:breakSecs};
+          }else{
+            try{new Notification("🧠 Hora de focar! "+u.focusMins+" min");}catch{}
+            return{...u,mode:'focus',secs:focusSecs};
+          }
         }
         return{...u,secs:u.secs-1};
       });
@@ -1089,7 +1102,6 @@ export default function App(){
           <button key={n.id} className={`ni${view===n.id?" on":""}`} onClick={()=>setView(n.id)}>
             <i className={`ti ${n.icon}`} aria-hidden/>{n.label}
             {n.id==="review"&&pendentesXl.length>0&&<span className="bdg" style={{background:"#2d1010",color:"#fca5a5",marginLeft:"auto"}}>{pendentesXl.length}</span>}
-            {n.id==="org"&&due>0&&<span className="bdg" style={{background:"#2d2010",color:"#fde68a",marginLeft:"auto"}}>{due}</span>}
           </button>
         ))}
         {/* Timer Ultrádio */}
@@ -1108,19 +1120,31 @@ export default function App(){
               <div style={{fontSize:22,fontWeight:700,color:ult.mode==='focus'?"#9D95E8":"#34C98A",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>
                 {String(Math.floor(ult.secs/60)).padStart(2,"0")}:{String(ult.secs%60).padStart(2,"0")}
               </div>
-              <div className="pb" style={{margin:"5px 0"}}>
-                <div className="pf" style={{width:`${ult.mode==='focus'?(1-(ult.secs/(90*60)))*100:(1-(ult.secs/(20*60)))*100}%`,background:ult.mode==='focus'?"#9D95E8":"#34C98A"}}/>
+              <div style={{fontSize:9,color:C.muted,marginBottom:3}}>{ult.mode==='focus'?`${ult.focusMins||ultFocusMins}min foco`:`${ult.breakMins||ultBreakMins}min pausa`}</div>
+              <div className="pb" style={{margin:"4px 0 7px"}}>
+                <div className="pf" style={{width:`${ult.mode==='focus'?(1-(ult.secs/((ult.focusMins||ultFocusMins)*60)))*100:(1-(ult.secs/((ult.breakMins||ultBreakMins)*60)))*100}%`,background:ult.mode==='focus'?"#9D95E8":"#34C98A"}}/>
               </div>
-              <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                <button onClick={()=>setUlt(u=>({...u,running:!u.running}))} className="btn btn-sm" style={{fontSize:11,padding:"3px 10px"}}>
-                  {ult.running?"⏸ Pausar":"▶ Retomar"}
-                </button>
-              </div>
+              <button onClick={()=>setUlt(u=>({...u,running:!u.running}))} className="btn btn-sm" style={{fontSize:11,padding:"3px 10px",width:"100%",justifyContent:"center"}}>
+                {ult.running?"⏸ Pausar":"▶ Retomar"}
+              </button>
             </div>
           ):(
-            <div style={{display:"flex",flexDirection:"column",gap:4}}>
-              <div style={{fontSize:10,color:C.muted,lineHeight:1.5}}>90 min foco + 20 min pausa (ciclo ultrádio)</div>
-              <button onClick={()=>setUlt({mode:'focus',secs:90*60,running:true})} className="btn btn-sm btnp" style={{fontSize:11,justifyContent:"center"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:9,color:C.muted,marginBottom:2}}>Foco (min)</div>
+                  <input type="number" min="5" max="180" step="5" value={ultFocusMins}
+                    onChange={e=>{const v=Math.max(5,Number(e.target.value));setUltFocusMins(v);LS.set("ultFocusMins",v);}}
+                    style={{fontSize:13,fontWeight:700,textAlign:"center",padding:"4px 6px",background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:6,color:"#9D95E8",width:"100%"}}/>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:9,color:C.muted,marginBottom:2}}>Pausa (min)</div>
+                  <input type="number" min="5" max="60" step="5" value={ultBreakMins}
+                    onChange={e=>{const v=Math.max(5,Number(e.target.value));setUltBreakMins(v);LS.set("ultBreakMins",v);}}
+                    style={{fontSize:13,fontWeight:700,textAlign:"center",padding:"4px 6px",background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:6,color:"#34C98A",width:"100%"}}/>
+                </div>
+              </div>
+              <button onClick={()=>setUlt({mode:'focus',secs:ultFocusMins*60,running:true,focusMins:ultFocusMins,breakMins:ultBreakMins})} className="btn btn-sm btnp" style={{fontSize:11,justifyContent:"center"}}>
                 ▶ Iniciar foco
               </button>
             </div>
@@ -1396,7 +1420,6 @@ export default function App(){
               <PageHeader title="Organização" sub={`${topics.length} tópicos · ${Object.values(folders).flat().length} pastas`}
                 btn={{label:"Novo tópico",icon:"ti-plus",fn:()=>setModal("topic")}}
                 extra={<>
-                  {unlinked.length>0&&<span style={{fontSize:11,color:"#fde68a",background:"#2d2010",padding:"3px 9px",borderRadius:20}}>{unlinked.length} sem revisão</span>}
                   <button className={`btn btn-sm${bulkMode?" btnp":""}`} onClick={()=>{if(bulkMode)clearSelection();else setBulkMode(true);}}>
                     <i className={`ti ${bulkMode?"ti-x":"ti-checklist"}`} aria-hidden/>{bulkMode?"Cancelar seleção":"Selecionar vários"}
                   </button>
@@ -1428,7 +1451,7 @@ export default function App(){
                 const aTopics=topics.filter(t=>t.area===area.id);
                 const aFolders=folders[area.id]||[];
                 const unfoldered=aTopics.filter(t=>!t.folder_id);
-                const dueInArea=aTopics.filter(t=>t.next_review&&t.next_review<=Date.now()).length;
+                // dueInArea removido — revisões ficam só na aba Revisão Espaçada
                 return(
                   <div key={area.id} style={{border:`0.5px solid ${C.bord}`,borderRadius:12,overflow:"hidden"}}>
                     <div className="area-header" style={{background:isOpen?area.bg:C.dim,borderBottom:isOpen?`0.5px solid ${C.bord}`:"none",borderRadius:isOpen?"12px 12px 0 0":12}} onClick={()=>toggleAreaCollapse(area.id)}>
@@ -1436,7 +1459,6 @@ export default function App(){
                       <i className={`ti ${area.icon}`} style={{fontSize:16,color:area.color}} aria-hidden/>
                       <span style={{fontWeight:600,fontSize:14,color:area.text,flex:1}}>{area.label}</span>
                       <span style={{fontSize:11,color:area.text,opacity:0.7}}>{aTopics.length} tópico{aTopics.length!==1?"s":""}</span>
-                      {dueInArea>0&&<span className="bdg" style={{background:"#2d1010",color:"#fca5a5"}}>{dueInArea} p/revisar</span>}
                       <div onClick={e=>e.stopPropagation()}>
                         <button className="btn btn-sm" title="Nova pasta" onClick={()=>{setFolderModal({mode:"create",area:area.id});setFolderModalName("");}}><i className="ti ti-folder-plus" aria-hidden/></button>
                       </div>
