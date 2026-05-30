@@ -744,6 +744,13 @@ export default function App(){
     const topic={id,area:result.area||"geral",folder_id:null,title:result.title,notes,note_content:result.raw,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null,user_id:session?.user?.id||null};
     setTopics(p=>[topic,...p]);
     try{await sb.from('topics').upsert({...topic,updated_at:new Date().toISOString()});}catch{}
+    // Auto-add to spaced review
+    const revId="t"+id;
+    if(!revRows.find(r=>r.id===revId)){
+      const row={id:revId,topic:result.title,cat:{"neuro":"Neuro","biblia":"Bíblia","ingles":"Inglês","livros":"Livros","geral":"Geral"}[result.area]||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
+      setRevRows(p=>[...p,row]);
+      try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
+    }
     // Save to inbox log
     const entry={id,title:result.title,area:result.area,ts:Date.now()};
     setCaptureInbox(prev=>{const nw=[entry,...prev].slice(0,50);LS.set("captureInbox",nw);return nw;});
@@ -793,8 +800,7 @@ export default function App(){
     {id:"review",label:"Revisão Espaçada",icon:"ti-calendar-repeat"},
     {id:"quiz",label:"Quiz Ativo",icon:"ti-help-circle"},
     {id:"books",label:"Livros",icon:"ti-book"},
-    {id:"goals",label:"Metas",icon:"ti-target"},
-    {id:"planner",label:"Planner",icon:"ti-layout-kanban"},
+
   ];
 
   const EmergencyAI=({t})=>{
@@ -1471,6 +1477,101 @@ export default function App(){
                   {pendentesXl.length>0&&<button className="btn btn-sm btnp" style={{marginTop:8,width:"100%"}} onClick={()=>setView("review")}>Ver todas →</button>}
                 </div>
               </div>
+
+              {/* Topicos sem revisao agendada */}
+              {(()=>{
+                const orphans=topics.filter(t=>!revRows.find(r=>r.id==="t"+t.id||r.topic===t.title));
+                if(orphans.length===0)return null;
+                return(
+                  <div className="card">
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <div className="st" style={{margin:0,display:"flex",alignItems:"center",gap:6}}>
+                        <i className="ti ti-alert-triangle" style={{color:"#FBBF24"}}/>
+                        {orphans.length} tópico{orphans.length!==1?"s":""} sem revisão espaçada
+                      </div>
+                      <button className="btn btn-sm" onClick={()=>setView("org")} style={{fontSize:11}}>Ver todos →</button>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {orphans.slice(0,4).map(t=>{
+                        const a=AREAS.find(x=>x.id===t.area)||AREAS[4];
+                        return(
+                          <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#17171f",borderRadius:8,borderLeft:`3px solid ${a.color}`}}>
+                            <span className="bdg" style={{background:a.bg,color:a.text,flexShrink:0}}>{a.label.split(" ")[0]}</span>
+                            <span style={{flex:1,fontSize:13,color:C.text,fontWeight:500}}>{t.title}</span>
+                            <button className="btn btn-sm btng" onClick={()=>addTopicToReview(t)} style={{flexShrink:0}}>
+                              <i className="ti ti-calendar-plus"/>Agendar
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {orphans.length>4&&<div style={{fontSize:11,color:C.muted,textAlign:"center"}}>+{orphans.length-4} tópicos sem revisão — <button onClick={()=>setView("org")} style={{background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>ver na Organização →</button></div>}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Metas ativas */}
+              {goals.filter(g=>Math.round((g.done/g.target)*100)<100).length>0&&(
+                <div className="card">
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                    <div className="st" style={{margin:0,display:"flex",alignItems:"center",gap:6}}>
+                      <i className="ti ti-target" style={{color:"#34C98A"}}/>Metas ativas
+                    </div>
+                    <button className="btn btn-sm" onClick={()=>setView("goals")} style={{fontSize:11}}>Gerenciar →</button>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {goals.filter(g=>Math.round((g.done/g.target)*100)<100).slice(0,4).map(g=>{
+                      const a=AREAS.find(x=>x.id===g.area);
+                      const pct=Math.min(100,Math.round((g.done/g.target)*100));
+                      return(
+                        <div key={g.id} style={{display:"flex",flexDirection:"column",gap:4}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span className="bdg" style={{background:a?.bg,color:a?.text}}>{a?.label?.split(" ")[0]}</span>
+                              <span style={{fontSize:13,color:C.text,fontWeight:500}}>{g.title}</span>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <span style={{fontSize:12,color:C.muted}}>{g.done}/{g.target} {g.unit}</span>
+                              <button className="btn btn-sm btng" style={{padding:"2px 8px",fontSize:11}} onClick={()=>updateGoalDone(g.id,Math.min(g.target,g.done+1))}>+1</button>
+                            </div>
+                          </div>
+                          <div className="pb"><div className="pf" style={{width:`${pct}%`,background:a?.color}}/></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Fluxo de estudo */}
+              {(()=>{
+                const steps=[];
+                if(pendentesXl.length>0) steps.push({icon:"ti-calendar-repeat",color:"#F87171",label:"Fazer revisões vencidas",count:pendentesXl.length,action:()=>setView("review"),cta:"Ir para Revisão"});
+                const readyQuiz=topics.filter(t=>t.notes&&t.notes.length>50).slice(0,3);
+                if(readyQuiz.length>0) steps.push({icon:"ti-help-circle",color:"#60A5FA",label:"Fazer quiz de um tópico",count:null,action:()=>setView("quiz"),cta:"Ir para Quiz"});
+                const orphans=topics.filter(t=>!revRows.find(r=>r.id==="t"+t.id||r.topic===t.title));
+                if(orphans.length>0) steps.push({icon:"ti-calendar-plus",color:"#FBBF24",label:"Agendar tópicos para revisão",count:orphans.length,action:()=>setView("org"),cta:"Organização"});
+                steps.push({icon:"ti-inbox",color:"#9D95E8",label:"Capturar novo conteúdo",count:null,action:()=>setView("capture"),cta:"Ir para Captura"});
+                return(
+                  <div className="card">
+                    <div className="st" style={{marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
+                      <i className="ti ti-route" style={{color:"#9D95E8"}}/>Fluxo de estudo sugerido para hoje
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {steps.map((s,i)=>(
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#12121a",borderRadius:8,borderLeft:`3px solid ${s.color}`}}>
+                          <div style={{width:22,height:22,borderRadius:"50%",background:s.color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                            <span style={{fontSize:11,fontWeight:700,color:s.color}}>{i+1}</span>
+                          </div>
+                          <i className={`ti ${s.icon}`} style={{color:s.color,flexShrink:0}}/>
+                          <span style={{flex:1,fontSize:13,color:C.text}}>{s.label}{s.count?<span style={{color:s.color,fontWeight:600,marginLeft:4}}>({s.count})</span>:null}</span>
+                          <button className="btn btn-sm" style={{flexShrink:0,borderColor:s.color+"44",color:s.color}} onClick={s.action}>{s.cta} →</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
@@ -2360,7 +2461,28 @@ export default function App(){
                                 style={{fontSize:13,resize:"vertical",lineHeight:1.8,background:"transparent",border:"none",padding:0,color:C.text,width:"100%",outline:"none",fontFamily:"inherit"}}/>
                             </div>
                           ))}
+                        <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid #2a2a38",display:"flex",gap:8}}>
+                          <button className="btn btn-sm" style={{flex:1,justifyContent:"center",display:"flex",alignItems:"center",gap:5,borderColor:"#3d3780",color:"#9D95E8"}}
+                            onClick={()=>{
+                              const raw=[`# ${ch.title}`,vals.resumo||"",vals.perguntas||"",vals.insights||""].filter(Boolean).join("\n\n");
+
+
+                              if(raw.trim().length<30){alert("Adicione pelo menos um resumo ou insights antes de capturar.");return;}
+                              onClose();
+                              setCaptureRaw(raw);
+                              setView("capture");
+                            }}>
+                            <i className="ti ti-inbox"/>Enviar para Captura
+                          </button>
+                          <button className="btn btn-sm" style={{flex:1,justifyContent:"center",display:"flex",alignItems:"center",gap:5,borderColor:"#1a3028",color:"#34C98A"}}
+                            onClick={()=>{
+                              if(!isChLinked)addChapterToReview(bookData,ch);
+                              else alert("Este capítulo já está na revisão espaçada.");
+                            }}>
+                            <i className="ti ti-calendar-plus"/>{isChLinked?"Na revisão ✓":"Agendar revisão"}
+                          </button>
                         </div>
+                      </div>
                       )}
                     </div>
                   );
