@@ -728,7 +728,7 @@ export default function App(){
       const questions=d.questions||[];
       if(!questions.length)throw new Error("Sem perguntas geradas");
       // não salva cache — cada quiz é gerado fresco com respostas embaralhadas
-      setQuiz({questions,idx:0,score:0,sel:null,topicTitle:item.title,topicId:item.id,isKnowledge:!!item.isKnowledge});
+      setQuiz({questions,idx:0,score:0,sel:null,topicTitle:item.title,topicId:item.id,isKnowledge:!!item.isKnowledge,answered:[]});
     }catch(e){setQErr("Erro ao gerar quiz: "+e.message);}
     finally{setQLoad(false);}
   },[topics]);
@@ -736,7 +736,8 @@ export default function App(){
   const answerQuiz=(selIdx)=>{
     if(quiz.sel!==null)return;
     const q=quiz.questions[quiz.idx];const correct=selIdx===q.ans;const score=quiz.score+(correct?1:0);
-    setQuiz(q2=>({...q2,sel:selIdx,score}));
+    const record={q:q.q,opts:q.opts,ans:q.ans,sel:selIdx,correct,exp:q.exp||""};
+    setQuiz(q2=>({...q2,sel:selIdx,score,answered:[...(q2.answered||[]),record]}));
     setTimeout(()=>setQuiz(q2=>{
       if(q2.idx+1>=q2.questions.length){
         const topicArea=topics.find(t=>t.id===q2.topicId)?.area||"geral";
@@ -744,7 +745,6 @@ export default function App(){
         setQuizResults(prev=>{const nr=[result,...prev.slice(0,199)];LS.set("quizResults",nr);return nr;});
         dbAddQuizResult(result);
         setQuizHistory(h=>[{date:t0,topic:q2.topicTitle,score,total:q2.questions.length},...h.slice(0,49)]);
-        // Não chama reviewTopic aqui — espera a avaliação de confiança do usuário
         return{...q2,done:true,awaitConf:!q2.isKnowledge&&!!q2.topicId};
       }
       return{...q2,idx:q2.idx+1,sel:null};
@@ -1644,6 +1644,46 @@ export default function App(){
                     <div style={{fontSize:11,color:C.muted,textAlign:"center"}}>
                       {topicHistory.length} tentativas · média {Math.round(topicHistory.reduce((s,r)=>s+(r.score/r.total)*100,0)/topicHistory.length)}%
                     </div>
+                  </div>
+                )}
+                {/* ── REVISÃO COMPLETA ── */}
+                {(quiz.answered||[]).length>0&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontWeight:600,fontSize:14}}>📋 Revisão detalhada</span>
+                      <span style={{fontSize:11,color:C.muted}}>{(quiz.answered||[]).filter(a=>!a.correct).length} erro(s)</span>
+                    </div>
+                    {(quiz.answered||[]).map((a,i)=>(
+                      <div key={i} style={{background:a.correct?"#0d1a0f":"#1a0d0d",border:`0.5px solid ${a.correct?"#1D6B50":"#7f2020"}`,borderLeft:`3px solid ${a.correct?"#34C98A":"#F87171"}`,borderRadius:10,padding:"12px 14px"}}>
+                        <div style={{display:"flex",gap:7,marginBottom:8,alignItems:"flex-start"}}>
+                          <span style={{fontSize:16,flexShrink:0}}>{a.correct?"✅":"❌"}</span>
+                          <p style={{fontSize:13,fontWeight:500,color:C.text,lineHeight:1.6,margin:0}}>{a.q}</p>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:a.exp?10:0}}>
+                          {a.opts.map((o,j)=>{
+                            const isCorrect=j===a.ans;
+                            const isSelected=j===a.sel;
+                            const bg=isCorrect?"#0d2218":isSelected&&!isCorrect?"#2d1010":"#12121a";
+                            const border=isCorrect?"#1D9E75":isSelected&&!isCorrect?"#7f2020":"#2a2a38";
+                            const color=isCorrect?"#34C98A":isSelected&&!isCorrect?"#F87171":"#8b8baa";
+                            return(
+                              <div key={j} style={{padding:"7px 11px",borderRadius:7,background:bg,border:`0.5px solid ${border}`,fontSize:12,color,display:"flex",gap:7,alignItems:"center"}}>
+                                <span style={{flexShrink:0,fontWeight:600}}>{["A","B","C","D"][j]}.</span>
+                                <span style={{flex:1}}>{o}</span>
+                                {isCorrect&&<span style={{fontSize:11,color:"#34C98A",flexShrink:0}}>✓ correta</span>}
+                                {isSelected&&!isCorrect&&<span style={{fontSize:11,color:"#F87171",flexShrink:0}}>✗ sua resp.</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {a.exp&&(
+                          <div style={{background:"#12121a",borderRadius:7,padding:"9px 12px",borderLeft:"3px solid #60A5FA"}}>
+                            <div style={{fontSize:10,color:"#60A5FA",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>💡 Justificativa</div>
+                            <p style={{fontSize:12,color:"#b0c4de",lineHeight:1.7,margin:0}}>{a.exp}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>);

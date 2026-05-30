@@ -9,8 +9,10 @@ function shuffle(arr) {
 
 function shuffleAnswers(questions) {
   return questions.map(q => {
-    const correct = q.opts[q.ans];
-    const shuffled = shuffle(q.opts);
+    // Remove letra prefixo (A. B. C. D.) se existir, para não confundir após shuffle
+    const cleanOpts = q.opts.map(o => o.replace(/^[A-Da-d][.)]\s*/,'').trim());
+    const correct = cleanOpts[q.ans];
+    const shuffled = shuffle(cleanOpts);
     return { ...q, opts: shuffled, ans: shuffled.indexOf(correct) };
   });
 }
@@ -25,18 +27,26 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'API key não configurada' });
 
   try {
-    const prompt = `Você é um professor especialista. Crie exatamente 10 perguntas de múltipla escolha em português brasileiro sobre o conteúdo abaixo.
+    const prompt = `Você é um professor universitário especialista em avaliação cognitiva. Crie exatamente 10 perguntas de múltipla escolha em português brasileiro sobre o conteúdo abaixo.
 
-REGRAS:
-1. Responda APENAS com JSON válido, sem texto antes ou depois
-2. Formato: [{"q":"pergunta?","opts":["A. opção","B. opção","C. opção","D. opção"],"ans":0}]
-3. "ans" é o índice (0-3) da resposta correta
-4. Perguntas difíceis: exijam compreensão profunda, não memorização
-5. Distratores plausíveis e bem elaborados
-6. Varie os tipos: definição, aplicação, comparação, causa/efeito
-7. Não repita conceitos entre perguntas
+NÍVEL DE DIFICULDADE: Intermediário-avançado. As perguntas devem:
+- Exigir compreensão e raciocínio, não simples memorização
+- Usar cenários hipotéticos ou situações de aplicação prática
+- Incluir distratores altamente plausíveis (erros comuns, conceitos similares mas incorretos)
+- Misturar tipos: análise, síntese, aplicação, causa/efeito, diferenciação entre conceitos
+- Evitar perguntas óbvias como "O que é X?" — prefira "Qual das afirmações sobre X está INCORRETA?" ou "Um paciente/aluno apresenta X, qual é o mecanismo mais provável?"
+
+REGRAS DE FORMATO:
+1. Responda APENAS com JSON válido, sem markdown, sem texto antes ou depois
+2. Formato exato: [{"q":"pergunta?","opts":["opção sem letra","opção sem letra","opção sem letra","opção sem letra"],"ans":0,"exp":"Justificativa completa: explique por que a resposta correta está certa E por que as outras estão erradas."}]
+3. "ans" é o índice (0-3) da resposta correta em opts
+4. NÃO inclua "A)", "B)", "C)", "D)" ou "a.", "b." nas opções — só o texto puro
+5. A resposta correta deve aparecer em posições variadas (0, 1, 2 ou 3), não sempre na mesma
+6. "exp" deve ter 2-4 frases explicando o raciocínio completo
+7. Exatamente 4 opções por pergunta, exatamente 10 perguntas
 
 CONTEÚDO:
+Título: ${title || 'Tópico de estudo'}
 ${notes.slice(0, 5000)}`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -48,7 +58,7 @@ ${notes.slice(0, 5000)}`;
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
+        max_tokens: 5000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -63,7 +73,7 @@ ${notes.slice(0, 5000)}`;
     const raw = JSON.parse(match[0]);
     if (!raw.length) throw new Error('Nenhuma pergunta gerada');
 
-    // Embaralha as respostas de cada pergunta para garantir distribuição
+    // Embaralha posições das respostas de cada pergunta
     const questions = shuffleAnswers(raw);
 
     return res.status(200).json({ questions });
