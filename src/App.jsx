@@ -303,6 +303,7 @@ export default function App(){
   const [knowledge,setKnowledge]=useState(()=>LS.get("knowledge",[]));
   const [planner,setPlanner]=useState(()=>LS.get("planner",{}));
   const [quizHistory,setQuizHistory]=useState(()=>LS.get("quizHistory",[]));
+  const [quizResults,setQuizResults]=useState(()=>LS.get("quizResults",[]));// [{topicId,topicTitle,date,score,total,area}]
   const [weekStudy,setWeekStudy]=useState(()=>LS.get("weekStudy",{neuro:0,biblia:0,ingles:0,livros:0,geral:0}));
   const [weeklySchedule,setWeeklySchedule]=useState(()=>LS.get("weeklySchedule",{}));
   const [plannerTab,setPlannerTab]=useState("weekly");
@@ -378,6 +379,7 @@ export default function App(){
   useEffect(()=>{if(loaded)LS.set("readingPlan",readingPlan);},[readingPlan,loaded]);
   useEffect(()=>{if(loaded)LS.set("dailyTasks",dailyTasks);},[dailyTasks,loaded]);
   useEffect(()=>{if(loaded)LS.set("hoursLogs",hoursLogs);},[hoursLogs,loaded]);
+  useEffect(()=>{if(loaded)LS.set("quizResults",quizResults);},[quizResults,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
@@ -423,6 +425,7 @@ export default function App(){
         }
         if(st.data?.hours_logs?.length>0){setHoursLogs(st.data.hours_logs);LS.set("hoursLogs",st.data.hours_logs);}
         if(st.data?.daily_tasks?.length>0){setDailyTasks(st.data.daily_tasks);LS.set("dailyTasks",st.data.daily_tasks);}
+        if(st.data?.quiz_results?.length>0){setQuizResults(st.data.quiz_results);LS.set("quizResults",st.data.quiz_results);}
         setSyncMsg("☁️ Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
       }catch{}
     })();
@@ -577,6 +580,12 @@ export default function App(){
     try{await sb.from('user_settings').upsert({user_id:session.user.id,daily_tasks:tasks,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveDailyTasks]',e)}
   },[session]);
 
+  const saveQuizResults=useCallback(async(results)=>{
+    LS.set("quizResults",results);
+    if(!session?.user?.id)return;
+    try{await sb.from('user_settings').upsert({user_id:session.user.id,quiz_results:results,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveQuizResults]',e)}
+  },[session]);
+
   const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule,newReadingPlan)=>{
     if(!session?.user?.id)return;
     clearTimeout(settingsTimer.current);
@@ -669,7 +678,14 @@ export default function App(){
     const q=quiz.questions[quiz.idx];const correct=selIdx===q.ans;const score=quiz.score+(correct?1:0);
     setQuiz(q2=>({...q2,sel:selIdx,score}));
     setTimeout(()=>setQuiz(q2=>{
-      if(q2.idx+1>=q2.questions.length){setQuizHistory(h=>[{date:t0,topic:q2.topicTitle,score,total:q2.questions.length},...h.slice(0,49)]);if(q2.topicId&&!q2.isKnowledge)reviewTopic(q2.topicId,correct?4:2);return{...q2,done:true};}
+      if(q2.idx+1>=q2.questions.length){
+        const topicArea=topics.find(t=>t.id===q2.topicId)?.area||"geral";
+        const result={topicId:q2.topicId,topicTitle:q2.topicTitle,date:t0,score,total:q2.questions.length,area:topicArea};
+        setQuizResults(prev=>{const nr=[result,...prev.slice(0,99)];saveQuizResults(nr);return nr;});
+        setQuizHistory(h=>[{date:t0,topic:q2.topicTitle,score,total:q2.questions.length},...h.slice(0,49)]);
+        if(q2.topicId&&!q2.isKnowledge)reviewTopic(q2.topicId,correct?4:2);
+        return{...q2,done:true};
+      }
       return{...q2,idx:q2.idx+1,sel:null};
     }),1200);
   };
@@ -683,6 +699,81 @@ export default function App(){
     {id:"goals",label:"Metas",icon:"ti-target"},
     {id:"planner",label:"Planner",icon:"ti-layout-kanban"},
   ];
+
+  const EmergencyAI=({t})=>{
+    const [open,setOpen]=useState(false);
+    const ai=topicAI[t.id]||{};
+    const buildOffline=()=>{
+      const notes=t.notes||"";if(notes.length<30)return;
+      const STOP=new Set(["a","o","e","é","de","do","da","em","um","uma","para","com","que","se","os","as","dos","das","no","na","por","mais","mas","ao","ou","não","já","isso","esse","esta","este","quando","sobre","após","entre","então","assim","muito","qual","cada","todo","toda","outros","podem","deve","pelo","pela","nos","nas","seu","sua","seus","suas","esse","essa","aquele","porque","como","onde","há","está","eram","será","foram","tinha","tem","este","estes","estas","esses","essas","ser","ter","foi","são","pelos","pelas","num","numa","também","ele","ela","eles","elas","seu","sua"]);
+      const sents=notes.split(/[.!?\n]+/).map(s=>s.trim()).filter(s=>s.length>25&&s.length<400);
+      const wFreq={};notes.toLowerCase().replace(/[^a-záàâãéèêíìîóòôõúùûç\s]/g," ").split(/\s+/).forEach(w=>{if(w.length>3&&!STOP.has(w))wFreq[w]=(wFreq[w]||0)+1;});
+      const topKw=Object.entries(wFreq).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([w])=>w);
+      const scored=sents.map((s,i)=>{const sw=s.toLowerCase().split(/\s+/);const sc=sw.reduce((sum,w)=>sum+(wFreq[w]||0),0)/Math.max(1,sw.length);return{text:s,score:sc+(i===0?3:i<2?1.5:0),idx:i};});
+      const top=scored.sort((a,b)=>b.score-a.score).slice(0,5).sort((a,b)=>a.idx-b.idx);
+      const COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A"];const cs=Math.ceil(topKw.length/4);
+      const ramos=COLORS.map((cor,i)=>{const chunk=topKw.slice(i*cs,(i+1)*cs);if(!chunk.length)return null;return{label:chunk[0].charAt(0).toUpperCase()+chunk[0].slice(1),cor,filhos:chunk.slice(1,5)};}).filter(Boolean);
+      setTopicAI(p=>({...p,[t.id]:{loading:false,error:null,resumo:top.map(s=>s.text).join(" "),mapa:{centro:t.title,ramos},isOffline:true}}));
+    };
+    const renderMapa=(mapa)=>{
+      if(!mapa?.ramos?.length)return null;
+      const W=680,H=460,cx=W/2,cy=H/2;const ramos=mapa.ramos||[];const N=ramos.length;const lines=[];
+      ramos.forEach((r,i)=>{const ang=(2*Math.PI/N*i)-Math.PI/2;const bx=cx+140*Math.cos(ang),by=cy+130*Math.sin(ang);
+        lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#9D95E8"}" stroke-width="2.5" opacity="0.6"/>`);
+        const tw=Math.min(130,Math.max(70,r.label.length*8));
+        lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#9D95E8"}22" stroke="${r.cor||"#9D95E8"}" stroke-width="1.5"/>`);
+        lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#9D95E8"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
+        (r.filhos||[]).forEach((f,j)=>{const ns=r.filhos.length;const subAng=ang+(j-(ns-1)/2)*0.42;const sx=bx+95*Math.cos(subAng),sy=by+85*Math.sin(subAng);
+          lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#9D95E8"}" stroke-width="1" opacity="0.35"/>`);
+          const sw=Math.min(100,Math.max(50,f.length*7));
+          lines.push(`<rect x="${sx-sw/2}" y="${sy-10}" width="${sw}" height="20" rx="5" fill="#12121a" stroke="#2a2a38" stroke-width="1"/>`);
+          lines.push(`<text x="${sx}" y="${sy+4}" text-anchor="middle" fill="#a0a0b8" font-size="9.5" font-family="system-ui,sans-serif">${(f||"").substring(0,16)}</text>`);
+        });
+      });
+      const ct=(mapa.centro||"").substring(0,22);const cw=Math.max(90,ct.length*9);
+      lines.push(`<ellipse cx="${cx}" cy="${cy}" rx="${cw/2+12}" ry="22" fill="#1c1838" stroke="#9D95E8" stroke-width="2"/>`);
+      lines.push(`<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#c8c4f8" font-size="12" font-weight="700" font-family="system-ui,sans-serif">${ct}</text>`);
+      return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:#0c0c10;border-radius:12px;border:0.5px solid #2a2a38;">${lines.join("")}</svg>`;
+    };
+    return(
+      <div style={{marginTop:10,borderTop:`0.5px solid ${C.bord}`}}>
+        <button onClick={()=>setOpen(o=>!o)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",padding:"8px 0",display:"flex",alignItems:"center",gap:7,color:C.muted,fontSize:12}}>
+          <i className={`ti ${open?"ti-chevron-down":"ti-chevron-right"}`} style={{fontSize:12}}/>
+          <i className="ti ti-shield-exclamation" style={{color:"#FBBF24"}}/>
+          <span style={{color:"#FBBF24",fontWeight:500}}>Consulta de emergência</span>
+          <span style={{fontSize:10,opacity:0.6,marginLeft:4}}>— use apenas se travar na revisão</span>
+        </button>
+        {open&&(
+          <div style={{padding:"10px 0 4px",display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{background:"#2d2010",border:"0.5px solid #5a4010",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#fde68a"}}>
+              ⚠️ <strong>Atenção:</strong> consultar o resumo antes de tentar lembrar compromete a consolidação da memória. Use só se realmente travou.
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button className="btn btn-sm btnp" onClick={buildOffline} style={{flex:1,justifyContent:"center"}}>
+                <i className="ti ti-bolt"/>Resumo Offline <span style={{fontSize:10,opacity:0.7,marginLeft:3}}>grátis</span>
+              </button>
+              <button className="btn btn-sm btng" onClick={()=>genAIMindMap(t)} disabled={ai.loading} style={{flex:1,justifyContent:"center"}}>
+                <i className={`ti ${ai.loading?"ti-loader-2":"ti-wand"}`} style={ai.loading?{animation:"spin 1s linear infinite"}:{}}/>
+                {ai.loading?"Gerando...":"Resumo com IA"}
+              </button>
+            </div>
+            {ai.isOffline&&<div style={{fontSize:11,color:"#9D95E8",background:"#1c1838",border:"0.5px solid #3d3780",borderRadius:6,padding:"3px 10px"}}>📝 Gerado offline · frequência de termos</div>}
+            {ai.error&&<div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#fca5a5"}}>⚠️ {ai.error}</div>}
+            {ai.resumo&&(
+              <div style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${ai.isOffline?"#9D95E8":"#34C98A"}`,borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
+                <div style={{fontSize:11,color:ai.isOffline?"#9D95E8":"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Resumo</div>
+                <ul style={{margin:0,paddingLeft:16,display:"flex",flexDirection:"column",gap:5}}>
+                  {ai.resumo.split(/(?<=[.!?])\s+/).filter(Boolean).map((s,i)=>(<li key={i} style={{fontSize:13,color:C.text,lineHeight:1.7}}>{s}</li>))}
+                </ul>
+              </div>
+            )}
+            {ai.mapa&&<div><div dangerouslySetInnerHTML={{__html:renderMapa(ai.mapa)}}/></div>}
+            {!(t.notes||"").trim()&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"0.5rem"}}>💡 Adicione notas para gerar resumo.</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const TopicRow=({t,area})=>{
     const exp=expanded===t.id;
@@ -718,11 +809,10 @@ export default function App(){
                 onBlur={e=>{if(e.target.value!==t.title)saveTopicEdits(t.id,{title:e.target.value});}}/>
             </div>
             <div style={{display:"flex",gap:5,padding:"8px 14px",borderBottom:`0.5px solid ${C.bord}`,flexWrap:"wrap"}}>
-              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"},{id:"ia",icon:"ti-brain",l:"Visão IA"}].map(tab=>{
+              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"}].map(tab=>{
                 const active=(topicTab[t.id]||"notes")===tab.id;
-                const clr=tab.id==="ia"?"#34C98A":"#9D95E8";
                 return(<button key={tab.id} onClick={()=>setTopicTab(p=>({...p,[t.id]:tab.id}))}
-                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?(tab.id==="ia"?"#1D6B50":"#3d3780"):C.bord}`,background:active?(tab.id==="ia"?"#0d2218":"#1c1838"):"transparent",color:active?clr:C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?"#3d3780":C.bord}`,background:active?"#1c1838":"transparent",color:active?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
                   <i className={`ti ${tab.icon}`}/>{tab.l}
                 </button>);
               })}
@@ -759,6 +849,8 @@ export default function App(){
                   <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
                   <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
+                {/* Consulta de emergência (IA) */}
+                <EmergencyAI t={t}/>
               </div>
             )}
             {topicTab[t.id]==="fichamento"&&(
@@ -790,10 +882,13 @@ export default function App(){
                   <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
                   <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
+                {/* Consulta de emergência (IA) */}
+                <EmergencyAI t={t}/>
               </div>
             )}
-            {/* ── ABA VISÃO IA ── */}
-            {topicTab[t.id]==="ia"&&(()=>{
+            {/* ── consulta emergência para notas tab ── */}
+            {/* placeholder — ia tab removed */}
+            {topicTab[t.id]==="ia_disabled"&&(()=>{
               const ai=topicAI[t.id]||{};
               /* ── Offline extractive summarizer ── */
               const buildOffline=()=>{
@@ -1022,9 +1117,34 @@ export default function App(){
               <div className="card">
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                   <div className="st" style={{margin:0}}>✅ Tarefas do dia — {new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"short"})}</div>
-                  {todayTasks.length>0&&<span style={{fontSize:12,color:doneCnt===todayTasks.length?"#34C98A":C.muted,fontWeight:600}}>{doneCnt}/{todayTasks.length} concluídas</span>}
+                  {(todayTasks.length+pendentesXl.length)>0&&<span style={{fontSize:12,color:doneCnt===todayTasks.length&&pendentesXl.every(r=>(r.checks||[]).find((c,i)=>!c)===undefined)?"#34C98A":C.muted,fontWeight:600}}>{doneCnt}/{todayTasks.length} manuais</span>}
                 </div>
-                {todayTasks.length===0&&<p style={{fontSize:13,color:C.muted,marginBottom:12,fontStyle:"italic"}}>Nenhuma tarefa ainda. Adicione sua primeira tarefa do dia!</p>}
+                {/* Revisões pendentes como tarefas automáticas */}
+                {pendentesXl.length>0&&(
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:11,color:"#F87171",fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                      <i className="ti ti-calendar-exclamation"/>Revisões vencidas ({pendentesXl.length})
+                    </div>
+                    {pendentesXl.slice(0,5).map(r=>{
+                      const nextIdx=(r.checks||[]).findIndex(c=>!c);
+                      const cs=CAT_STYLE[r.cat]||CAT_STYLE["Geral"];
+                      return(
+                        <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:5,background:"#1a0f0f",borderRadius:8,borderLeft:"3px solid #F87171"}}>
+                          <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:"2px solid #F87171",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <i className="ti ti-calendar" style={{fontSize:10,color:"#F87171"}}/>
+                          </div>
+                          <span className="bdg" style={{background:cs.bg,color:cs.text,flexShrink:0}}>{r.cat}</span>
+                          <span style={{flex:1,fontSize:13,color:"#fca5a5",fontWeight:500}}>{r.topic}</span>
+                          {nextIdx>=0&&<button className="btn btn-sm btng" onClick={()=>toggleXlCheck(r.id,nextIdx)} style={{flexShrink:0}}>✓ Feito</button>}
+                          <button className="btn btn-sm btnp" onClick={()=>setView("review")} style={{flexShrink:0}}>Ver</button>
+                        </div>
+                      );
+                    })}
+                    {pendentesXl.length>5&&<div style={{fontSize:11,color:C.muted,textAlign:"center",marginTop:4}}>+{pendentesXl.length-5} revisões vencidas — <button onClick={()=>setView("review")} style={{background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>ver todas →</button></div>}
+                  </div>
+                )}
+                {/* Tarefas manuais */}
+                {todayTasks.length===0&&pendentesXl.length===0&&<p style={{fontSize:13,color:C.muted,marginBottom:12,fontStyle:"italic"}}>Nenhuma tarefa ainda. Adicione sua primeira tarefa do dia!</p>}
                 {todayTasks.map(t=>(
                   <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,background:t.done?"#1a1830":"#17171f",borderRadius:8,borderLeft:`3px solid ${t.done?"#9D95E8":C.bord}`,transition:"all 0.2s",cursor:"pointer"}} onClick={()=>toggleDTask(t.id)}>
                     <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:`2px solid ${t.done?"#9D95E8":C.bord}`,background:t.done?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -1035,7 +1155,7 @@ export default function App(){
                   </div>
                 ))}
                 <div style={{display:"flex",gap:8,marginTop:8}}>
-                  <input value={dailyTaskInput} onChange={e=>setDailyTaskInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addDTask()} placeholder="Nova tarefa..." style={{flex:1,fontSize:14}}/>
+                  <input value={dailyTaskInput} onChange={e=>setDailyTaskInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addDTask()} placeholder="Nova tarefa manual..." style={{flex:1,fontSize:14}}/>
                   <button className="btn btnp" onClick={addDTask} style={{flexShrink:0}}><i className="ti ti-plus"/>Adicionar</button>
                 </div>
               </div>
@@ -1119,6 +1239,44 @@ export default function App(){
                   </div>
                 )}
               </div>
+
+              {/* Retenção por área */}
+              {quizResults.length>0&&(()=>{
+                const retention=AREAS.map(a=>{
+                  const aResults=quizResults.filter(r=>r.area===a.id).slice(0,10);
+                  if(aResults.length===0)return{...a,pct:null,attempts:0};
+                  const pct=Math.round(aResults.reduce((s,r)=>s+(r.score/r.total)*100,0)/aResults.length);
+                  return{...a,pct,attempts:aResults.length};
+                }).filter(a=>a.attempts>0);
+                if(retention.length===0)return null;
+                return(
+                  <div className="card">
+                    <div className="st">🧠 Saúde de Retenção por Área</div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
+                      {retention.map(a=>{
+                        const health=a.pct>=80?"ótima":a.pct>=60?"boa":a.pct>=40?"fraca":"crítica";
+                        const hColor=a.pct>=80?"#34C98A":a.pct>=60?"#60A5FA":a.pct>=40?"#FBBF24":"#F87171";
+                        const hBg=a.pct>=80?"#0d2218":a.pct>=60?"#1a2840":a.pct>=40?"#2d2410":"#2d1010";
+                        return(
+                          <div key={a.id} style={{background:hBg,borderRadius:10,padding:"12px",border:`0.5px solid ${hColor}33`,display:"flex",flexDirection:"column",gap:6}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <i className={`ti ${a.icon}`} style={{color:hColor,fontSize:15}}/>
+                              <span style={{fontSize:12,color:hColor,fontWeight:600}}>{a.label.split(" ")[0]}</span>
+                            </div>
+                            <div style={{fontSize:28,fontWeight:700,color:hColor,lineHeight:1}}>{a.pct}%</div>
+                            <div className="pb"><div className="pf" style={{width:`${a.pct}%`,background:hColor}}/></div>
+                            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:hColor,opacity:0.8}}>
+                              <span>{health}</span>
+                              <span>{a.attempts}× quiz</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{fontSize:11,color:C.muted,marginTop:8}}>Média das últimas 10 tentativas por área · Verde ≥80% · Azul ≥60% · Amarelo ≥40% · Vermelho &lt;40%</div>
+                  </div>
+                );
+              })()}
 
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                 <div className="card">
@@ -1333,7 +1491,8 @@ export default function App(){
           if(quiz){
             if(quiz.done){
               const pct=Math.round((quiz.score/quiz.questions.length)*100);
-              return(<div style={{maxWidth:500,margin:"0 auto"}}>
+              const topicHistory=quizResults.filter(r=>r.topicId===quiz.topicId).slice(0,8);
+              return(<div style={{maxWidth:500,margin:"0 auto",display:"flex",flexDirection:"column",gap:12}}>
                 <div className="card" style={{textAlign:"center",padding:"2rem"}}>
                   <div style={{fontSize:44,marginBottom:10}}>{pct>=80?"🎉":pct>=60?"💪":"📚"}</div>
                   <h2 style={{fontSize:21,fontWeight:500,marginBottom:3}}>{quiz.score}/{quiz.questions.length}</h2>
@@ -1344,6 +1503,23 @@ export default function App(){
                     <button className="btn" onClick={()=>{setQuiz(null);setView("review");}}>Ver revisões</button>
                   </div>
                 </div>
+                {topicHistory.length>1&&(
+                  <div className="card">
+                    <div className="st">📈 Evolução neste tópico</div>
+                    <div style={{display:"flex",alignItems:"flex-end",gap:5,height:60,marginBottom:6}}>
+                      {topicHistory.slice().reverse().map((r,i)=>{const p=Math.round((r.score/r.total)*100);return(
+                        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                          <span style={{fontSize:9,color:p>=80?"#34C98A":p>=60?"#FBBF24":"#F87171",fontWeight:600}}>{p}%</span>
+                          <div style={{width:"100%",background:p>=80?"#34C98A":p>=60?"#FBBF24":"#F87171",borderRadius:"3px 3px 0 0",height:`${Math.max(6,(p/100)*44)}px`,opacity:i===topicHistory.length-1?1:0.6}}/>
+                          <span style={{fontSize:8,color:C.muted}}>{r.date.slice(5)}</span>
+                        </div>);
+                      })}
+                    </div>
+                    <div style={{fontSize:11,color:C.muted,textAlign:"center"}}>
+                      {topicHistory.length} tentativas · média {Math.round(topicHistory.reduce((s,r)=>s+(r.score/r.total)*100,0)/topicHistory.length)}%
+                    </div>
+                  </div>
+                )}
               </div>);
             }
             const q=quiz.questions[quiz.idx];
@@ -1391,21 +1567,28 @@ export default function App(){
                         </div>
                         {isOpen&&(
                           <div style={{padding:"8px",display:"flex",flexDirection:"column",gap:5}}>
-                            {aTopics.map(t=>(
+                            {aTopics.map(t=>{
+                              const tHistory=quizResults.filter(r=>r.topicId===t.id);
+                              const lastResult=tHistory[0];
+                              const avgPct=tHistory.length>0?Math.round(tHistory.slice(0,5).reduce((s,r)=>s+(r.score/r.total)*100,0)/Math.min(5,tHistory.length)):null;
+                              return(
                               <div key={t.id} className="card" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"10px 14px",borderLeft:`3px solid ${area.color}`}}>
                                 <div style={{flex:1,minWidth:0}}>
                                   <div style={{fontWeight:500,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
-                                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                                    {t.quiz_cache&&<span className="bdg" style={{background:"#0d2218",color:"#34C98A"}}>Quiz salvo ✓</span>}
-                                    <span style={{fontSize:10,color:C.muted}}>{(t.notes||"").slice(0,60)}…</span>
+                                  <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                                    {lastResult&&<span className="bdg" style={{background:avgPct>=80?"#0d2218":avgPct>=60?"#2d2010":"#2d1010",color:avgPct>=80?"#34C98A":avgPct>=60?"#FBBF24":"#F87171"}}>
+                                      {tHistory.length}× · {avgPct}%
+                                    </span>}
+                                    {!lastResult&&<span className="bdg" style={{background:"#17171f",color:C.muted}}>Nunca feito</span>}
+                                    <span style={{fontSize:10,color:C.muted}}>{(t.notes||"").slice(0,50)}…</span>
                                   </div>
                                 </div>
                                 <div style={{display:"flex",gap:6,flexShrink:0}}>
-                                  {t.quiz_cache&&<button className="btn btn-sm btng" onClick={()=>genQuiz(t)}>▶ Iniciar</button>}
-                                  <button className="btn btn-sm btnp" onClick={()=>genQuiz(t,true)}><i className="ti ti-wand" aria-hidden/>Gerar</button>
+                                  <button className="btn btn-sm btnp" onClick={()=>genQuiz(t,true)}><i className="ti ti-wand" aria-hidden/>Quiz</button>
                                 </div>
                               </div>
-                            ))}
+                            );})}
+
                           </div>
                         )}
                       </div>
