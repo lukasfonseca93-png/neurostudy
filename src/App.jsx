@@ -17,6 +17,7 @@ const CAT_STYLE = {
   "Geral":    {color:"#F87171",bg:"#2d1a1a",text:"#fca5a5"},
 };
 const REV_LABELS = ["+1d","+10d","+30d","+90d","+180d","+360d","+720d","+1440d"];
+const EBB_INTERVALS=[1,3,7,14,30,90]; // Ebbinghaus: rep 0→1d, 1→3d, 2→7d, 3→14d, 4→30d, 5+→90d
 const PERIODS = ["semanal","mensal","semestral","anual"];
 
 const DEFAULT_FOLDERS = {
@@ -353,6 +354,8 @@ export default function App(){
   const [ng,setNg]=useState({area:"neuro",title:"",target:"",unit:"",period:"anual"});
   const [nr,setNr]=useState({topic:"",cat:"Neuro",base_date:today()});
   const t0=today();
+  const [ult,setUlt]=useState(null); // {mode:'focus'|'break',secs,running}
+  const ultRef=useRef(null);
   const foldersTimer=useRef(null);
   const weekStudyTimer=useRef(null);
   const scheduleTimer=useRef(null);
@@ -385,6 +388,22 @@ export default function App(){
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
+
+  useEffect(()=>{
+    if(!ult?.running){clearInterval(ultRef.current);return;}
+    ultRef.current=setInterval(()=>{
+      setUlt(u=>{
+        if(!u||!u.running)return u;
+        if(u.secs<=1){
+          const next=u.mode==='focus'?{mode:'break',secs:20*60,running:true}:{mode:'focus',secs:90*60,running:true};
+          try{new Notification(next.mode==='break'?"⏰ Pausa! 20 min de descanso":"🧠 Hora de focar! 90 min de estudo");}catch{}
+          return next;
+        }
+        return{...u,secs:u.secs-1};
+      });
+    },1000);
+    return()=>clearInterval(ultRef.current);
+  },[ult?.running]);
 
   useEffect(()=>{
     sb.auth.getSession().then(({data:{session:s}})=>{setSession(s);setAuthLoading(false);});
@@ -503,14 +522,21 @@ export default function App(){
   },[moveModal,moveTarget]);
 
   const reviewTopic=useCallback(async(id,qual)=>{
+    // qual: 5=fácil, 3=difícil, 1=não sabia
     const topic=topics.find(t=>t.id===id);if(!topic)return;
-    const ef=Math.max(1.3,(topic.ef||2.5)+(0.1-(5-qual)*(0.08+(5-qual)*0.02)));
-    const interval=topic.repetitions===0?1:topic.repetitions===1?6:Math.round((topic.interval_days||1)*ef);
+    let reps=topic.repetitions||0;let interval;
+    if(qual>=4){// Fácil — avança na curva de Ebbinghaus
+      interval=EBB_INTERVALS[Math.min(reps,EBB_INTERVALS.length-1)];
+      reps=reps+1;
+    }else if(qual>=2){// Difícil — mantém posição, intervalo reduzido
+      interval=Math.max(1,Math.floor((EBB_INTERVALS[Math.min(reps,EBB_INTERVALS.length-1)]||1)*0.5));
+    }else{// Não sabia — reinicia do zero
+      interval=1;reps=0;
+    }
     const next=Date.now()+interval*864e5;
-    const updated={...topic,repetitions:(topic.repetitions||0)+1,interval_days:interval,next_review:next,ef};
     const ts=new Date().toISOString();
-    setTopics(p=>p.map(t=>t.id===id?{...updated,updated_at:ts}:t));
-    try{await sb.from('topics').update({repetitions:updated.repetitions,interval_days:interval,next_review:next,ef,updated_at:ts}).eq('id',id);}catch{}
+    setTopics(p=>p.map(t=>t.id===id?{...t,repetitions:reps,interval_days:interval,next_review:next,updated_at:ts}:t));
+    try{await sb.from('topics').update({repetitions:reps,interval_days:interval,next_review:next,updated_at:ts}).eq('id',id);}catch{}
   },[topics]);
 
   const createFolder=(area,name)=>{if(!name.trim())return;const id="f"+Date.now();setFolders(p=>({...p,[area]:[...(p[area]||[]),{id,name:name.trim()}]}));};
@@ -705,8 +731,8 @@ export default function App(){
         setQuizResults(prev=>{const nr=[result,...prev.slice(0,199)];LS.set("quizResults",nr);return nr;});
         dbAddQuizResult(result);
         setQuizHistory(h=>[{date:t0,topic:q2.topicTitle,score,total:q2.questions.length},...h.slice(0,49)]);
-        if(q2.topicId&&!q2.isKnowledge)reviewTopic(q2.topicId,correct?4:2);
-        return{...q2,done:true};
+        // Não chama reviewTopic aqui — espera a avaliação de confiança do usuário
+        return{...q2,done:true,awaitConf:!q2.isKnowledge&&!!q2.topicId};
       }
       return{...q2,idx:q2.idx+1,sel:null};
     }),1200);
@@ -1066,6 +1092,41 @@ export default function App(){
             {n.id==="org"&&due>0&&<span className="bdg" style={{background:"#2d2010",color:"#fde68a",marginLeft:"auto"}}>{due}</span>}
           </button>
         ))}
+        {/* Timer Ultrádio */}
+        <div style={{margin:"10px 0",padding:"10px 10px 8px",background:ult?ult.mode==='focus'?"#1c1838":"#0d2218":C.dim,borderRadius:10,border:`0.5px solid ${ult?ult.mode==='focus'?"#3d3780":"#1D6B50":C.bord}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <span style={{fontSize:13}}>{ult?.mode==='break'?"🌿":"🧠"}</span>
+              <span style={{fontSize:11,fontWeight:600,color:ult?.mode==='break'?"#34C98A":ult?.mode==='focus'?"#9D95E8":C.muted}}>
+                {ult?ult.mode==='focus'?"Foco":"Pausa":"Timer Ultrádio"}
+              </span>
+            </div>
+            {ult&&<button onClick={()=>{setUlt(null);clearInterval(ultRef.current);}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:14,lineHeight:1}}>×</button>}
+          </div>
+          {ult?(
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:700,color:ult.mode==='focus'?"#9D95E8":"#34C98A",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>
+                {String(Math.floor(ult.secs/60)).padStart(2,"0")}:{String(ult.secs%60).padStart(2,"0")}
+              </div>
+              <div className="pb" style={{margin:"5px 0"}}>
+                <div className="pf" style={{width:`${ult.mode==='focus'?(1-(ult.secs/(90*60)))*100:(1-(ult.secs/(20*60)))*100}%`,background:ult.mode==='focus'?"#9D95E8":"#34C98A"}}/>
+              </div>
+              <div style={{display:"flex",gap:4,justifyContent:"center"}}>
+                <button onClick={()=>setUlt(u=>({...u,running:!u.running}))} className="btn btn-sm" style={{fontSize:11,padding:"3px 10px"}}>
+                  {ult.running?"⏸ Pausar":"▶ Retomar"}
+                </button>
+              </div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{fontSize:10,color:C.muted,lineHeight:1.5}}>90 min foco + 20 min pausa (ciclo ultrádio)</div>
+              <button onClick={()=>setUlt({mode:'focus',secs:90*60,running:true})} className="btn btn-sm btnp" style={{fontSize:11,justifyContent:"center"}}>
+                ▶ Iniciar foco
+              </button>
+            </div>
+          )}
+        </div>
+
         <div style={{marginTop:"auto",paddingTop:12,borderTop:`0.5px solid ${C.bord}`}}>
           <div style={{fontSize:10,color:C.muted,padding:"4px 9px"}}>{Object.values(weekStudy).reduce((a,b)=>a+b,0).toFixed(1)}h esta semana</div>
           <div style={{fontSize:11,color:"#6b6b85",padding:"4px 9px 6px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={session.user.email}>
@@ -1520,10 +1581,31 @@ export default function App(){
                   <h2 style={{fontSize:21,fontWeight:500,marginBottom:3}}>{quiz.score}/{quiz.questions.length}</h2>
                   <p style={{color:C.muted,marginBottom:10,fontSize:12}}>{pct}% — {quiz.topicTitle}</p>
                   <div className="pb" style={{height:7,margin:"0 0 14px"}}><div className="pf" style={{width:`${pct}%`,background:pct>=80?"#34C98A":pct>=60?"#FBBF24":"#F87171"}}/></div>
-                  <div style={{display:"flex",gap:8,justifyContent:"center"}}>
-                    <button className="btn btnp" onClick={()=>setQuiz(null)}>Novo quiz</button>
-                    <button className="btn" onClick={()=>{setQuiz(null);setView("review");}}>Ver revisões</button>
-                  </div>
+                  {/* Avaliação de confiança (Metacognição) — ajusta intervalo Ebbinghaus */}
+                  {quiz.awaitConf?(
+                    <div style={{marginBottom:14}}>
+                      <div style={{fontSize:12,color:C.muted,marginBottom:10,fontWeight:500}}>Como foi para você? <span style={{fontSize:10,opacity:0.7}}>(ajusta seu próximo intervalo de revisão)</span></div>
+                      <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                        {[
+                          {emoji:"😊",label:"Fácil",sub:"→ +30 dias",qual:5,bg:"#0d2218",border:"#1D6B50",color:"#34C98A"},
+                          {emoji:"😅",label:"Difícil",sub:"→ +7 dias",qual:3,bg:"#2d2410",border:"#5a4a10",color:"#FBBF24"},
+                          {emoji:"😔",label:"Não sabia",sub:"→ reinicia",qual:1,bg:"#2d1010",border:"#7f2020",color:"#F87171"},
+                        ].map(c=>(
+                          <button key={c.qual} onClick={()=>{reviewTopic(quiz.topicId,c.qual);setQuiz(q=>({...q,awaitConf:false}));}}
+                            style={{flex:1,minWidth:90,padding:"10px 6px",borderRadius:10,border:`1.5px solid ${c.border}`,background:c.bg,color:c.color,cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"opacity 0.15s"}}>
+                            <span style={{fontSize:22}}>{c.emoji}</span>
+                            <span style={{fontWeight:600,fontSize:13}}>{c.label}</span>
+                            <span style={{fontSize:10,opacity:0.7}}>{c.sub}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ):(
+                    <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:6}}>
+                      <button className="btn btnp" onClick={()=>setQuiz(null)}>Novo quiz</button>
+                      <button className="btn" onClick={()=>{setQuiz(null);setView("review");}}>Ver revisões</button>
+                    </div>
+                  )}
                 </div>
                 {topicHistory.length>1&&(
                   <div className="card">
@@ -1563,9 +1645,36 @@ export default function App(){
           }
 
           // Quiz selection — grouped by area
+          // Interleaving: sugestão de sessão intercalada
+          const areasComTopicos=AREAS.filter(a=>topics.some(t=>t.area===a.id));
+          const interleavingSuggestion=areasComTopicos.length>=2?(()=>{
+            const mixed=areasComTopicos.map(a=>{const ts=topics.filter(t=>t.area===a.id);return ts[Math.floor(Math.random()*ts.length)];}).filter(Boolean).slice(0,Math.min(5,areasComTopicos.length));
+            return mixed;
+          })():null;
           return(
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Quiz Ativo" sub="Teste seu conhecimento com IA"/>
+              {/* Banner de Interleaving */}
+              {interleavingSuggestion&&interleavingSuggestion.length>=2&&(
+                <div style={{background:"linear-gradient(135deg,#1c1838 0%,#0d2218 100%)",border:"0.5px solid #3d3780",borderRadius:12,padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:200}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
+                      <span style={{fontSize:18}}>🔀</span>
+                      <span style={{fontWeight:600,fontSize:14,color:"#9D95E8"}}>Sessão Intercalada</span>
+                      <span style={{fontSize:10,background:"#1c1838",border:"0.5px solid #534AB7",borderRadius:20,padding:"2px 7px",color:"#9D95E8"}}>+40% retenção</span>
+                    </div>
+                    <p style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.6}}>A <strong style={{color:"#c8c4f8"}}>prática intercalada</strong> mistura tópicos de áreas diferentes — o cérebro trabalha mais, mas a retenção aumenta 40% vs estudar uma área só.</p>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      {interleavingSuggestion.map(t=>{const a=AREAS.find(x=>x.id===t.area);return(
+                        <button key={t.id} className="btn btn-sm" onClick={()=>genQuiz(t,true)}
+                          style={{background:a?.bg,borderColor:a?.color+"66",color:a?.text,fontSize:11}}>
+                          <i className={`ti ${a?.icon}`}/>{t.title.slice(0,20)}{t.title.length>20?"…":""}
+                        </button>
+                      );})}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 <button className={`atab${quizAreaTab==="topics"?" on":""}`} style={quizAreaTab==="topics"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setQuizAreaTab("topics")}><i className="ti ti-books" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
                 <button className={`atab${quizAreaTab==="knowledge"?" on":""}`} style={quizAreaTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#34C98A"}:{}} onClick={()=>setQuizAreaTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
