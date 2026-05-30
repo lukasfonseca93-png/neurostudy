@@ -353,13 +353,15 @@ export default function App(){
   const [ng,setNg]=useState({area:"neuro",title:"",target:"",unit:"",period:"anual"});
   const [nr,setNr]=useState({topic:"",cat:"Neuro",base_date:today()});
   const t0=today();
-  const settingsTimer=useRef(null);
+  const foldersTimer=useRef(null);
+  const weekStudyTimer=useRef(null);
+  const scheduleTimer=useRef(null);
 
   useEffect(()=>{if(loaded)LS.set("topics",topics);},[topics,loaded]);
   useEffect(()=>{
     if(!loaded)return;
     LS.set("folders",folders);
-    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
+    saveFolders(folders);
   },[folders,loaded]);
   useEffect(()=>{if(loaded)LS.set("revRows",revRows);},[revRows,loaded]);
   useEffect(()=>{if(loaded)LS.set("books",books);},[books,loaded]);
@@ -369,12 +371,12 @@ export default function App(){
   useEffect(()=>{
     if(!loaded)return;
     LS.set("weeklySchedule",weeklySchedule);
-    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
+    saveWeeklySchedule(weeklySchedule);
   },[weeklySchedule,loaded]);
   useEffect(()=>{
     if(!loaded)return;
     LS.set("weekStudy",weekStudy);
-    saveSettings(folders,weekStudy,weeklySchedule,readingPlan);
+    saveWeekStudy(weekStudy);
   },[weekStudy,loaded]);
   useEffect(()=>{if(loaded)LS.set("readingPlan",readingPlan);},[readingPlan,loaded]);
   useEffect(()=>{if(loaded)LS.set("dailyTasks",dailyTasks);},[dailyTasks,loaded]);
@@ -397,18 +399,21 @@ export default function App(){
     setLoaded(true);
     (async()=>{
       try{
-        const [t,r,b,g,sl,k,st,pl,hl,dt,qr]=await Promise.all([
+        const [t,r,b,g,sl,k,pl,hl,dt,qr,uf,uws,uwsc,urp]=await Promise.all([
           sb.from('topics').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
           sb.from('rev_rows').select('*').eq('user_id',session.user.id).order('base_date',{ascending:false}),
           sb.from('books').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
           sb.from('goals').select('*').eq('user_id',session.user.id),
           sb.from('study_logs').select('*').order('log_date',{ascending:false}).limit(90),
           sb.from('knowledge').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
-          sb.from('user_settings').select('*').eq('user_id',session.user.id).single(),
           sb.from('planner').select('*').eq('user_id',session.user.id),
           sb.from('hours_logs').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
           sb.from('daily_tasks').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
           sb.from('quiz_results').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}).limit(200),
+          sb.from('user_folders').select('*').eq('user_id',session.user.id).single(),
+          sb.from('user_week_study').select('*').eq('user_id',session.user.id).single(),
+          sb.from('user_weekly_schedule').select('*').eq('user_id',session.user.id).single(),
+          sb.from('user_reading_plan').select('*').eq('user_id',session.user.id).single(),
         ]);
         const mi=(l,r)=>{const m=new Map();l.forEach(x=>m.set(String(x.id),x));r.forEach(x=>{const ex=m.get(String(x.id));if(!ex||(x.updated_at&&(!ex.updated_at||x.updated_at>ex.updated_at)))m.set(String(x.id),x);});return[...m.values()];};
         if(t.data?.length>0){setTopics(p=>{const m=mi(p,t.data);LS.set("topics",m);return m;});}
@@ -416,12 +421,11 @@ export default function App(){
         if(b.data?.length>0){setBooks(b.data);LS.set("books",b.data);}
         if(g.data?.length>0){setGoals(g.data);LS.set("goals",g.data);}
         if(k.data?.length>0){setKnowledge(k.data);LS.set("knowledge",k.data);}
-        if(st.data){
-          if(st.data.folders){setFolders(st.data.folders);LS.set("folders",st.data.folders);}
-          if(st.data.week_study){setWeekStudy(st.data.week_study);LS.set("weekStudy",st.data.week_study);}
-          if(st.data.weekly_schedule){setWeeklySchedule(st.data.weekly_schedule);LS.set("weeklySchedule",st.data.weekly_schedule);}
-          {const rp=st.data.reading_plan;if(rp&&Object.keys(rp).length>0&&(rp.stats||rp.categories||rp.schedule||rp.tips||rp.meta!=null||rp.entries?.length>0||rp.columns?.length>0||Object.keys(rp.rows||{}).length>0)){setReadingPlan(rp);LS.set("readingPlan",rp);}}
-        }
+        // Tabelas individuais — sem race condition
+        if(uf.data?.data&&Object.keys(uf.data.data).length>0){setFolders(uf.data.data);LS.set("folders",uf.data.data);}
+        if(uws.data){const ws={neuro:uws.data.neuro||0,biblia:uws.data.biblia||0,ingles:uws.data.ingles||0,livros:uws.data.livros||0,geral:uws.data.geral||0};setWeekStudy(ws);LS.set("weekStudy",ws);}
+        if(uwsc.data?.data&&Object.keys(uwsc.data.data).length>0){setWeeklySchedule(uwsc.data.data);LS.set("weeklySchedule",uwsc.data.data);}
+        {const rp=urp.data?.data;if(rp&&Object.keys(rp).length>0&&(rp.stats||rp.categories||rp.schedule||rp.tips||rp.meta!=null||rp.entries?.length>0||rp.columns?.length>0||Object.keys(rp.rows||{}).length>0)){setReadingPlan(rp);LS.set("readingPlan",rp);}}
         if(pl.data?.length>0){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
           setPlanner(pm);LS.set("planner",pm);
@@ -563,13 +567,33 @@ export default function App(){
   };;
 
   const saveReadingPlan=useCallback(async(plan)=>{
-    if(!session?.user?.id)return;
     LS.set("readingPlan",plan);
-    try{await sb.from('user_settings').upsert({
-      user_id:session.user.id,
-      reading_plan:plan,
-      updated_at:new Date().toISOString()
-    },{onConflict:'user_id'});}catch(e){console.error('[saveReadingPlan]',e)}
+    if(!session?.user?.id)return;
+    try{await sb.from('user_reading_plan').upsert({user_id:session.user.id,data:plan,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveReadingPlan]',e)}
+  },[session]);
+
+  const saveFolders=useCallback(async(data)=>{
+    if(!session?.user?.id)return;
+    clearTimeout(foldersTimer.current);
+    foldersTimer.current=setTimeout(async()=>{
+      try{await sb.from('user_folders').upsert({user_id:session.user.id,data,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveFolders]',e)}
+    },1500);
+  },[session]);
+
+  const saveWeekStudy=useCallback(async(ws)=>{
+    if(!session?.user?.id)return;
+    clearTimeout(weekStudyTimer.current);
+    weekStudyTimer.current=setTimeout(async()=>{
+      try{await sb.from('user_week_study').upsert({user_id:session.user.id,...ws,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveWeekStudy]',e)}
+    },500);
+  },[session]);
+
+  const saveWeeklySchedule=useCallback(async(data)=>{
+    if(!session?.user?.id)return;
+    clearTimeout(scheduleTimer.current);
+    scheduleTimer.current=setTimeout(async()=>{
+      try{await sb.from('user_weekly_schedule').upsert({user_id:session.user.id,data,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveWeeklySchedule]',e)}
+    },1500);
   },[session]);
 
   // ── Operações individuais por linha (não mais JSONB bulk) ──
@@ -596,20 +620,7 @@ export default function App(){
     try{await sb.from('quiz_results').insert({id:result.id,user_id:session.user.id,topic_id:String(result.topicId||""),topic_title:result.topicTitle||"",date:result.date,score:result.score,total:result.total,area:result.area||"geral"});}catch(e){console.error('[dbAddQuizResult]',e)}
   },[session]);
 
-  const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule,newReadingPlan)=>{
-    if(!session?.user?.id)return;
-    clearTimeout(settingsTimer.current);
-    settingsTimer.current=setTimeout(async()=>{
-      try{await sb.from('user_settings').upsert({
-        user_id:session.user.id,
-        folders:newFolders,
-        week_study:newWeekStudy,
-        weekly_schedule:newWeeklySchedule,
-        reading_plan:newReadingPlan!==undefined?newReadingPlan:readingPlan,
-        updated_at:new Date().toISOString()
-      },{onConflict:'user_id'});}catch(e){console.error('[saveSettings]',e)}
-    },1500);
-  },[session]);
+  // saveSettings removido — cada dado tem sua própria função dedicada
 
   const toggleXlCheck=useCallback(async(rowId,idx)=>{
     const row=revRows.find(r=>r.id===rowId);if(!row)return;
