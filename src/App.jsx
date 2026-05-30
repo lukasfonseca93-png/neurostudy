@@ -738,8 +738,8 @@ export default function App(){
   const confirmCapture=useCallback(async(result)=>{
     const tags=result.tags||[];
     const id=Date.now();
-    const notes=[result.summary,...(result.keyPoints||[]).map(p=>"• "+p)].join("
-");
+    const notes=[result.summary,...(result.keyPoints||[]).map(p=>"\u2022 "+p)].join("\n");
+
     const topic={id,area:result.area||"geral",folder_id:null,title:result.title,notes,note_content:result.raw,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null,user_id:session?.user?.id||null};
     setTopics(p=>[topic,...p]);
     try{await sb.from('topics').upsert({...topic,updated_at:new Date().toISOString()});}catch{}
