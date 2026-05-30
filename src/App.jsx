@@ -349,7 +349,7 @@ export default function App(){
   const [bulkMoveTarget,setBulkMoveTarget]=useState({area:"neuro",folder_id:""});
   const [folderModal,setFolderModal]=useState(null);
   const [folderModalName,setFolderModalName]=useState("");
-  const [nt,setNt]=useState({title:"",notes:"",tags:"",area:"neuro",folder_id:""});
+  const [nt,setNt]=useState({title:"",notes:"",tags:"",area:"neuro",folder_id:"",note_content:""});
   const [nb,setNb]=useState({title:"",author:"",area:"livros",status:"queued",notes:""});
   const [ng,setNg]=useState({area:"neuro",title:"",target:"",unit:"",period:"anual"});
   const [nr,setNr]=useState({topic:"",cat:"Neuro",base_date:today()});
@@ -358,6 +358,11 @@ export default function App(){
   const [ultFocusMins,setUltFocusMins]=useState(()=>LS.get("ultFocusMins",90));
   const [ultBreakMins,setUltBreakMins]=useState(()=>LS.get("ultBreakMins",20));
   const ultRef=useRef(null);
+  const [captureRaw,setCaptureRaw]=useState("");
+  const [captureResult,setCaptureResult]=useState(null);
+  const [captureLoading,setCaptureLoading]=useState(false);
+  const [captureErr,setCaptureErr]=useState(null);
+  const [captureInbox,setCaptureInbox]=useState(()=>LS.get("captureInbox",[]));
   const foldersTimer=useRef(null);
   const weekStudyTimer=useRef(null);
   const scheduleTimer=useRef(null);
@@ -482,8 +487,8 @@ export default function App(){
 
   const addTopic=useCallback(async()=>{
     const tags=nt.tags.split(",").map(t=>t.trim()).filter(Boolean);const id=Date.now();
-    const topic={id,area:nt.area,folder_id:nt.folder_id||null,title:nt.title,notes:nt.notes,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null,user_id:session?.user?.id||null};
-    setTopics(p=>[topic,...p]);setModal(null);setNt({title:"",notes:"",tags:"",area:"neuro",folder_id:""});
+    const topic={id,area:nt.area,folder_id:nt.folder_id||null,title:nt.title,notes:nt.notes,note_content:nt.note_content||null,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null,user_id:session?.user?.id||null};
+    setTopics(p=>[topic,...p]);setModal(null);setNt({title:"",notes:"",tags:"",area:"neuro",folder_id:"",note_content:""});
     try{await sb.from('topics').upsert({...topic,updated_at:new Date().toISOString()});}catch{}
   },[nt]);
 
@@ -717,12 +722,40 @@ export default function App(){
   const delPlannerCard=(colId,cardId)=>savePlanner(aArea,pd.map(c=>c.id===colId?{...c,cards:c.cards.filter(x=>x.id!==cardId)}:c));
   const delPlannerCol=(colId)=>{if(!confirm("Excluir coluna?"))return;savePlanner(aArea,pd.filter(c=>c.id!==colId));};
 
+
+  const processCapture=useCallback(async(raw)=>{
+    if(!raw||raw.trim().length<20){setCaptureErr("Cole pelo menos um parágrafo para processar.");return;}
+    setCaptureLoading(true);setCaptureErr(null);setCaptureResult(null);
+    try{
+      const resp=await fetch("/api/capture",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({rawNote:raw})});
+      const d=await resp.json();
+      if(!resp.ok)throw new Error(d.error||"Erro ao processar nota");
+      setCaptureResult({...d,raw,confirmed:false});
+    }catch(e){setCaptureErr("Erro: "+e.message);}
+    finally{setCaptureLoading(false);}
+  },[]);
+
+  const confirmCapture=useCallback(async(result)=>{
+    const tags=result.tags||[];
+    const id=Date.now();
+    const notes=[result.summary,...(result.keyPoints||[]).map(p=>"• "+p)].join("
+");
+    const topic={id,area:result.area||"geral",folder_id:null,title:result.title,notes,note_content:result.raw,tags,created_at:Date.now(),next_review:Date.now(),interval_days:0,repetitions:0,quiz_cache:null,user_id:session?.user?.id||null};
+    setTopics(p=>[topic,...p]);
+    try{await sb.from('topics').upsert({...topic,updated_at:new Date().toISOString()});}catch{}
+    // Save to inbox log
+    const entry={id,title:result.title,area:result.area,ts:Date.now()};
+    setCaptureInbox(prev=>{const nw=[entry,...prev].slice(0,50);LS.set("captureInbox",nw);return nw;});
+    setCaptureResult(null);setCaptureRaw("");
+    setView("org");
+  },[session]);
+
   const genQuiz=useCallback(async(item,force=false)=>{
     // sempre gera novo quiz — não usa cache para garantir respostas embaralhadas
     setQLoad(true);setQErr(null);
     try{
       const notes=item.notes||item.content||"";
-      const resp=await fetch("/api/quiz",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({notes,title:item.title})});
+      const resp=await fetch("/api/quiz",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({notes,title:item.title,noteContent:item.note_content||""})});
       const d=await resp.json();
       if(!resp.ok)throw new Error(d.error||"Erro ao gerar quiz");
       const questions=d.questions||[];
@@ -753,6 +786,7 @@ export default function App(){
 
   const NAV=[
     {id:"dashboard",label:"Dashboard",icon:"ti-layout-dashboard"},
+    {id:"capture",label:"Captura",icon:"ti-inbox"},
     {id:"progress",label:"Progresso",icon:"ti-trending-up"},
     {id:"org",label:"Organização",icon:"ti-folders"},
     {id:"review",label:"Revisão Espaçada",icon:"ti-calendar-repeat"},
@@ -871,7 +905,7 @@ export default function App(){
                 onBlur={e=>{if(e.target.value!==t.title)saveTopicEdits(t.id,{title:e.target.value});}}/>
             </div>
             <div style={{display:"flex",gap:5,padding:"8px 14px",borderBottom:`0.5px solid ${C.bord}`,flexWrap:"wrap"}}>
-              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"}].map(tab=>{
+              {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"},{id:"fonte",icon:"ti-notes-off",l:"Nota Fonte"}].map(tab=>{
                 const active=(topicTab[t.id]||"notes")===tab.id;
                 return(<button key={tab.id} onClick={()=>setTopicTab(p=>({...p,[t.id]:tab.id}))}
                   style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?"#3d3780":C.bord}`,background:active?"#1c1838":"transparent",color:active?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
@@ -946,6 +980,33 @@ export default function App(){
                 </div>
                 {/* Consulta de emergência (IA) */}
                 <EmergencyAI t={t}/>
+              </div>
+            )}
+            {topicTab[t.id]==="fonte"&&(
+              <div style={{padding:"12px 14px 16px",display:"flex",flexDirection:"column",gap:10,background:"#0f0f13"}}>
+                {t.note_content?(
+                  <>
+                    <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderLeft:"3px solid #34C98A",borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
+                      <div style={{fontSize:11,color:"#34C98A",fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                        <i className="ti ti-leaf"/>Nota Original (Obsidian)
+                      </div>
+                      <div style={{fontSize:12,color:"#a0a0b8",lineHeight:1.8,whiteSpace:"pre-wrap",maxHeight:300,overflowY:"auto"}}>{t.note_content}</div>
+                    </div>
+                    <div style={{fontSize:11,color:"#6b6b85",display:"flex",gap:8,alignItems:"center"}}>
+                      <i className="ti ti-info-circle"/>
+                      <span>Esta nota é a fonte original que gerou o tópico. O quiz usa ela como referência.</span>
+                    </div>
+                    <button className="btn btn-sm" style={{alignSelf:"flex-start"}} onClick={()=>genQuiz(t,true)}>
+                      <i className="ti ti-help-circle"/> Gerar quiz da nota original
+                    </button>
+                  </>
+                ):(
+                  <div style={{textAlign:"center",padding:"24px 0",color:"#6b6b85"}}>
+                    <i className="ti ti-inbox" style={{fontSize:28,display:"block",marginBottom:8}}/>
+                    <div style={{fontSize:13,marginBottom:4}}>Nenhuma nota fonte vinculada</div>
+                    <div style={{fontSize:11}}>Use a aba <strong style={{color:"#9D95E8"}}>Captura</strong> para importar uma nota do Obsidian e ela aparecerá aqui automaticamente.</div>
+                  </div>
+                )}
               </div>
             )}
             {/* ── consulta emergência para notas tab ── */}
@@ -1414,6 +1475,158 @@ export default function App(){
         })()}
 
         {/* PROGRESSO */}
+
+        {view==="capture"&&(()=>{
+          const AREA_LABELS={"neuro":"Neurociências","biblia":"Estudo Bíblico","ingles":"Inglês","livros":"Livros","geral":"Área Geral"};
+          const AREA_COLORS={"neuro":"#9D95E8","biblia":"#34C98A","ingles":"#60A5FA","livros":"#F87171","geral":"#FBBF24"};
+          return(
+            <div style={{maxWidth:760,margin:"0 auto",padding:"0 4px 40px"}}>
+              {/* Header */}
+              <div style={{marginBottom:20}}>
+                <h2 style={{fontSize:20,fontWeight:700,color:"#e8e8f2",margin:0,display:"flex",alignItems:"center",gap:8}}>
+                  <i className="ti ti-inbox" style={{color:"#9D95E8"}}/>Captura Rápida
+                </h2>
+                <p style={{fontSize:13,color:"#6b6b85",marginTop:4,marginBottom:0}}>
+                  Cole qualquer texto — nota do Obsidian, trecho de livro, insight, artigo — e a IA extrai estrutura e cria um tópico de revisão automático.
+                </p>
+              </div>
+
+              {/* Input area */}
+              {!captureResult&&(
+                <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:12,padding:16,marginBottom:16}}>
+                  <div style={{fontSize:12,color:"#6b6b85",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                    <i className="ti ti-clipboard-text"/>Cole sua nota aqui
+                  </div>
+                  <textarea
+                    value={captureRaw}
+                    onChange={e=>setCaptureRaw(e.target.value)}
+                    placeholder={"Cole aqui:\n• Nota do Obsidian\n• Trecho de livro ou artigo\n• Transcrição de podcast ou aula\n• Seus insights e reflexões\n\nA IA identifica o tema, extrai pontos-chave e cria um tópico pronto para revisão espaçada."}
+                    rows={12}
+                    style={{width:"100%",background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:8,padding:"12px",color:"#e8e8f2",fontSize:13,lineHeight:1.8,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box"}}
+                  />
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
+                    <span style={{fontSize:11,color:"#6b6b85"}}>{captureRaw.length>0?captureRaw.length+" chars":""}</span>
+                    <div style={{display:"flex",gap:8}}>
+                      {captureRaw.trim()&&<button className="btn btn-sm" onClick={()=>setCaptureRaw("")}>Limpar</button>}
+                      <button
+                        className="btn btnp"
+                        disabled={captureLoading||captureRaw.trim().length<20}
+                        onClick={()=>processCapture(captureRaw)}
+                        style={{minWidth:140,display:"flex",alignItems:"center",gap:6,justifyContent:"center"}}
+                      >
+                        {captureLoading?(
+                          <><i className="ti ti-loader-2" style={{animation:"spin 1s linear infinite"}}/>Processando...</>
+                        ):(
+                          <><i className="ti ti-sparkles"/>Processar com IA</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {captureErr&&<div style={{marginTop:10,padding:"8px 12px",background:"#2d1010",borderRadius:8,fontSize:12,color:"#fca5a5"}}>{captureErr}</div>}
+                </div>
+              )}
+
+              {/* Result card */}
+              {captureResult&&(
+                <div style={{background:"#17171f",border:"1px solid #3d3780",borderRadius:12,padding:20,marginBottom:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                    <div>
+                      <div style={{fontSize:11,color:"#9D95E8",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
+                        ✦ Nota processada — revise antes de confirmar
+                      </div>
+                      <h3 style={{fontSize:18,fontWeight:700,color:"#e8e8f2",margin:0}}>{captureResult.title}</h3>
+                    </div>
+                    <span style={{padding:"4px 12px",borderRadius:20,fontSize:11,fontWeight:600,background:(AREA_COLORS[captureResult.area]||"#9D95E8")+"22",color:AREA_COLORS[captureResult.area]||"#9D95E8"}}>
+                      {AREA_LABELS[captureResult.area]||captureResult.area}
+                    </span>
+                  </div>
+
+                  {/* Summary */}
+                  <div style={{background:"#12121a",borderRadius:8,padding:"10px 14px",marginBottom:12,borderLeft:"3px solid #9D95E8"}}>
+                    <div style={{fontSize:11,color:"#9D95E8",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Resumo</div>
+                    <p style={{fontSize:13,color:"#c8c4f8",lineHeight:1.7,margin:0}}>{captureResult.summary}</p>
+                  </div>
+
+                  {/* Key Points */}
+                  <div style={{background:"#12121a",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
+                    <div style={{fontSize:11,color:"#60A5FA",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Pontos-chave extraídos</div>
+                    {(captureResult.keyPoints||[]).map((p,i)=>(
+                      <div key={i} style={{display:"flex",gap:8,marginBottom:6,fontSize:13,color:"#e8e8f2",lineHeight:1.6}}>
+                        <span style={{color:"#60A5FA",fontWeight:700,flexShrink:0}}>{i+1}.</span>
+                        <span>{p}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Connections */}
+                  {(captureResult.connections||[]).length>0&&(
+                    <div style={{background:"#12121a",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
+                      <div style={{fontSize:11,color:"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Conexões com outros conceitos</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {(captureResult.connections||[]).map((c,i)=>(
+                          <span key={i} style={{padding:"3px 10px",borderRadius:20,background:"#1a3028",color:"#7ee8bc",fontSize:12}}>{c}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+                    {(captureResult.tags||[]).map((tag,i)=>(
+                      <span key={i} style={{padding:"3px 10px",borderRadius:20,background:"#1e1e28",color:"#6b6b85",border:"0.5px solid #2a2a38",fontSize:11}}># {tag}</span>
+                    ))}
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                    <button className="btn btn-sm" onClick={()=>{setCaptureResult(null);}}>
+                      ← Editar nota
+                    </button>
+                    <button className="btn btnp" onClick={()=>confirmCapture(captureResult)} style={{display:"flex",alignItems:"center",gap:6}}>
+                      <i className="ti ti-check"/>Criar tópico de revisão
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent captures */}
+              {captureInbox.length>0&&!captureResult&&(
+                <div>
+                  <div style={{fontSize:12,color:"#6b6b85",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                    <i className="ti ti-history"/>Capturas recentes ({captureInbox.length})
+                  </div>
+                  {captureInbox.slice(0,8).map(entry=>(
+                    <div key={entry.id} style={{background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:8,padding:"10px 14px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:13,color:"#e8e8f2",fontWeight:500}}>{entry.title}</div>
+                        <div style={{fontSize:11,color:"#6b6b85",marginTop:2}}>
+                          <span style={{color:AREA_COLORS[entry.area]||"#6b6b85"}}>{AREA_LABELS[entry.area]||entry.area}</span>
+                          {" · "}{new Date(entry.ts).toLocaleDateString("pt-BR",{day:"numeric",month:"short"})}
+                        </div>
+                      </div>
+                      <button className="btn btn-sm" onClick={()=>{setView("org");}}>
+                        Ver tópico <i className="ti ti-arrow-right"/>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Empty state */}
+              {captureInbox.length===0&&!captureResult&&!captureRaw&&(
+                <div style={{textAlign:"center",padding:"32px 0",color:"#6b6b85"}}>
+                  <i className="ti ti-plant" style={{fontSize:36,display:"block",marginBottom:12,color:"#34C98A"}}/>
+                  <div style={{fontSize:14,fontWeight:500,color:"#a0a0b8",marginBottom:6}}>Seu Commonplace Book começa aqui</div>
+                  <div style={{fontSize:12,lineHeight:1.7}}>
+                    Capture qualquer coisa que aprendeu.<br/>
+                    A IA transforma em material estruturado de revisão espaçada.
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {view==="progress"&&(()=>{
           // ── Streak de consistência ──
           const studiedDays=new Set(hoursLogs.map(l=>l.date));
