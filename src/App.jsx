@@ -397,7 +397,7 @@ export default function App(){
     setLoaded(true);
     (async()=>{
       try{
-        const [t,r,b,g,sl,k,st,pl]=await Promise.all([
+        const [t,r,b,g,sl,k,st,pl,hl,dt,qr]=await Promise.all([
           sb.from('topics').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
           sb.from('rev_rows').select('*').eq('user_id',session.user.id).order('base_date',{ascending:false}),
           sb.from('books').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
@@ -406,6 +406,9 @@ export default function App(){
           sb.from('knowledge').select('*').eq('user_id',session.user.id).order('updated_at',{ascending:false}),
           sb.from('user_settings').select('*').eq('user_id',session.user.id).single(),
           sb.from('planner').select('*').eq('user_id',session.user.id),
+          sb.from('hours_logs').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
+          sb.from('daily_tasks').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}),
+          sb.from('quiz_results').select('*').eq('user_id',session.user.id).order('created_at',{ascending:false}).limit(200),
         ]);
         const mi=(l,r)=>{const m=new Map();l.forEach(x=>m.set(String(x.id),x));r.forEach(x=>{const ex=m.get(String(x.id));if(!ex||(x.updated_at&&(!ex.updated_at||x.updated_at>ex.updated_at)))m.set(String(x.id),x);});return[...m.values()];};
         if(t.data?.length>0){setTopics(p=>{const m=mi(p,t.data);LS.set("topics",m);return m;});}
@@ -423,9 +426,10 @@ export default function App(){
           const pm={};pl.data.forEach(p=>{pm[p.area]=p.cols;});
           setPlanner(pm);LS.set("planner",pm);
         }
-        if(st.data?.hours_logs?.length>0){setHoursLogs(st.data.hours_logs);LS.set("hoursLogs",st.data.hours_logs);}
-        if(st.data?.daily_tasks?.length>0){setDailyTasks(st.data.daily_tasks);LS.set("dailyTasks",st.data.daily_tasks);}
-        if(st.data?.quiz_results?.length>0){setQuizResults(st.data.quiz_results);LS.set("quizResults",st.data.quiz_results);}
+        // Tabelas individuais — mais seguro que JSONB
+        if(hl.data?.length>0){const logs=hl.data.map(l=>({id:l.id,date:l.date,hours:l.hours,category:l.category}));setHoursLogs(logs);LS.set("hoursLogs",logs);}
+        if(dt.data?.length>0){const tasks=dt.data.map(x=>({id:x.id,text:x.text,done:x.done,date:x.task_date}));setDailyTasks(tasks);LS.set("dailyTasks",tasks);}
+        if(qr.data?.length>0){const results=qr.data.map(x=>({id:x.id,topicId:x.topic_id,topicTitle:x.topic_title,date:x.date,score:x.score,total:x.total,area:x.area}));setQuizResults(results);LS.set("quizResults",results);}
         setSyncMsg("☁️ Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
       }catch{}
     })();
@@ -568,22 +572,28 @@ export default function App(){
     },{onConflict:'user_id'});}catch(e){console.error('[saveReadingPlan]',e)}
   },[session]);
 
-  const saveHoursLogs=useCallback(async(logs)=>{
-    LS.set("hoursLogs",logs);
+  // ── Operações individuais por linha (não mais JSONB bulk) ──
+  const dbAddHoursLog=useCallback(async(log)=>{
     if(!session?.user?.id)return;
-    try{await sb.from('user_settings').upsert({user_id:session.user.id,hours_logs:logs,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveHoursLogs]',e)}
+    try{await sb.from('hours_logs').insert({id:log.id,user_id:session.user.id,date:log.date,hours:log.hours,category:log.category});}catch(e){console.error('[dbAddHoursLog]',e)}
+  },[session]);
+  const dbDelHoursLog=useCallback(async(id)=>{
+    if(!session?.user?.id)return;
+    try{await sb.from('hours_logs').delete().eq('id',id).eq('user_id',session.user.id);}catch(e){console.error('[dbDelHoursLog]',e)}
   },[session]);
 
-  const saveDailyTasks=useCallback(async(tasks)=>{
-    LS.set("dailyTasks",tasks);
+  const dbUpsertDTask=useCallback(async(task)=>{
     if(!session?.user?.id)return;
-    try{await sb.from('user_settings').upsert({user_id:session.user.id,daily_tasks:tasks,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveDailyTasks]',e)}
+    try{await sb.from('daily_tasks').upsert({id:task.id,user_id:session.user.id,text:task.text,done:task.done,task_date:task.date,updated_at:new Date().toISOString()},{onConflict:'id'});}catch(e){console.error('[dbUpsertDTask]',e)}
+  },[session]);
+  const dbDelDTask=useCallback(async(id)=>{
+    if(!session?.user?.id)return;
+    try{await sb.from('daily_tasks').delete().eq('id',id).eq('user_id',session.user.id);}catch(e){console.error('[dbDelDTask]',e)}
   },[session]);
 
-  const saveQuizResults=useCallback(async(results)=>{
-    LS.set("quizResults",results);
+  const dbAddQuizResult=useCallback(async(result)=>{
     if(!session?.user?.id)return;
-    try{await sb.from('user_settings').upsert({user_id:session.user.id,quiz_results:results,updated_at:new Date().toISOString()},{onConflict:'user_id'});}catch(e){console.error('[saveQuizResults]',e)}
+    try{await sb.from('quiz_results').insert({id:result.id,user_id:session.user.id,topic_id:String(result.topicId||""),topic_title:result.topicTitle||"",date:result.date,score:result.score,total:result.total,area:result.area||"geral"});}catch(e){console.error('[dbAddQuizResult]',e)}
   },[session]);
 
   const saveSettings=useCallback(async(newFolders,newWeekStudy,newWeeklySchedule,newReadingPlan)=>{
@@ -680,8 +690,9 @@ export default function App(){
     setTimeout(()=>setQuiz(q2=>{
       if(q2.idx+1>=q2.questions.length){
         const topicArea=topics.find(t=>t.id===q2.topicId)?.area||"geral";
-        const result={topicId:q2.topicId,topicTitle:q2.topicTitle,date:t0,score,total:q2.questions.length,area:topicArea};
-        setQuizResults(prev=>{const nr=[result,...prev.slice(0,99)];saveQuizResults(nr);return nr;});
+        const result={id:Date.now()+"",topicId:q2.topicId,topicTitle:q2.topicTitle,date:t0,score,total:q2.questions.length,area:topicArea};
+        setQuizResults(prev=>{const nr=[result,...prev.slice(0,199)];LS.set("quizResults",nr);return nr;});
+        dbAddQuizResult(result);
         setQuizHistory(h=>[{date:t0,topic:q2.topicTitle,score,total:q2.questions.length},...h.slice(0,49)]);
         if(q2.topicId&&!q2.isKnowledge)reviewTopic(q2.topicId,correct?4:2);
         return{...q2,done:true};
@@ -1061,19 +1072,19 @@ export default function App(){
           const byArea=AREAS.map(a=>({...a,count:topics.filter(t=>t.area===a.id).length}));
           const totalWeekHrs=Object.values(weekStudy).reduce((a,b)=>a+b,0);
           const todayStr=new Date().toISOString().slice(0,10);
-          // Daily tasks helpers
-          const addDTask=()=>{if(!dailyTaskInput.trim())return;const t={id:Date.now()+"",text:dailyTaskInput.trim(),done:false,date:todayStr};const nw=[...dailyTasks,t];setDailyTasks(nw);saveDailyTasks(nw);setDailyTaskInput("");};
-          const toggleDTask=(id)=>{const nw=dailyTasks.map(t=>t.id===id?{...t,done:!t.done}:t);setDailyTasks(nw);saveDailyTasks(nw);};
-          const delDTask=(id)=>{const nw=dailyTasks.filter(t=>t.id!==id);setDailyTasks(nw);saveDailyTasks(nw);};
+          // Daily tasks helpers — operações individuais por row
+          const addDTask=()=>{if(!dailyTaskInput.trim())return;const task={id:Date.now()+"",text:dailyTaskInput.trim(),done:false,date:todayStr};const nw=[...dailyTasks,task];setDailyTasks(nw);LS.set("dailyTasks",nw);dbUpsertDTask(task);setDailyTaskInput("");};
+          const toggleDTask=(id)=>{const nw=dailyTasks.map(t=>t.id===id?{...t,done:!t.done}:t);setDailyTasks(nw);LS.set("dailyTasks",nw);const upd=nw.find(t=>t.id===id);if(upd)dbUpsertDTask(upd);};
+          const delDTask=(id)=>{const nw=dailyTasks.filter(t=>t.id!==id);setDailyTasks(nw);LS.set("dailyTasks",nw);dbDelDTask(id);};
           const todayTasks=dailyTasks.filter(t=>t.date===todayStr);
           const doneCnt=todayTasks.filter(t=>t.done).length;
-          // Hours tracker helpers
+          // Hours tracker helpers — operações individuais por row
           const addHoursLog=()=>{
             const h=parseFloat(hoursInput.h);if(!h||h<=0)return;
             const log={id:Date.now()+"",date:todayStr,hours:h,category:hoursInput.cat};
-            const nw=[...hoursLogs,log];setHoursLogs(nw);saveHoursLogs(nw);setHoursInput({h:"",cat:"neuro"});
+            const nw=[...hoursLogs,log];setHoursLogs(nw);LS.set("hoursLogs",nw);dbAddHoursLog(log);setHoursInput({h:"",cat:"neuro"});
           };
-          const delHoursLog=(id)=>{const nw=hoursLogs.filter(l=>l.id!==id);setHoursLogs(nw);saveHoursLogs(nw);};
+          const delHoursLog=(id)=>{const nw=hoursLogs.filter(l=>l.id!==id);setHoursLogs(nw);LS.set("hoursLogs",nw);dbDelHoursLog(id);};
           // Aggregation helpers
           const fmt=(d)=>d.toISOString().slice(0,10);
           const today=new Date();
