@@ -753,6 +753,7 @@ export default function App(){
 
   const NAV=[
     {id:"dashboard",label:"Dashboard",icon:"ti-layout-dashboard"},
+    {id:"progress",label:"Progresso",icon:"ti-trending-up"},
     {id:"org",label:"Organização",icon:"ti-folders"},
     {id:"review",label:"Revisão Espaçada",icon:"ti-calendar-repeat"},
     {id:"quiz",label:"Quiz Ativo",icon:"ti-help-circle"},
@@ -1408,6 +1409,214 @@ export default function App(){
                   {pendentesXl.length>0&&<button className="btn btn-sm btnp" style={{marginTop:8,width:"100%"}} onClick={()=>setView("review")}>Ver todas →</button>}
                 </div>
               </div>
+            </div>
+          );
+        })()}
+
+        {/* PROGRESSO */}
+        {view==="progress"&&(()=>{
+          // ── Streak de consistência ──
+          const studiedDays=new Set(hoursLogs.map(l=>l.date));
+          let streak=0;
+          const chk=new Date();
+          for(let i=0;i<180;i++){
+            const ds=chk.toISOString().slice(0,10);
+            if(studiedDays.has(ds)){streak++;chk.setDate(chk.getDate()-1);}
+            else break;
+          }
+          // ── Conformidade revisões ──
+          const allChks=revRows.flatMap(r=>(r.checks||[]).map((c,i)=>({done:c===1,date:(r.revs||[])[i]})));
+          const duePast=allChks.filter(c=>c.date&&c.date<=t0);
+          const compliance=duePast.length>0?Math.round(duePast.filter(c=>c.done).length/duePast.length*100):100;
+          // ── Maturidade tópicos ──
+          const getStage=reps=>reps>=5?'dominado':reps>=3?'consolidando':reps>=1?'aprendendo':'novo';
+          const stageC={novo:'#6b6b85',aprendendo:'#FBBF24',consolidando:'#60A5FA',dominado:'#34C98A'};
+          const stageL={novo:'Novo',aprendendo:'Aprendendo',consolidando:'Consolidando',dominado:'Dominado'};
+          const dominated=topics.filter(t=>(t.repetitions||0)>=5).length;
+          // ── Score médio ──
+          const avgScore=quizResults.length>0?Math.round(quizResults.slice(0,20).reduce((s,r)=>s+(r.score/r.total)*100,0)/Math.min(20,quizResults.length)):null;
+          // ── Trend semanal (8 semanas) ──
+          const weeklyTrend=[];
+          for(let i=7;i>=0;i--){
+            const wEnd=new Date();wEnd.setDate(wEnd.getDate()-i*7);
+            const wStart=new Date(wEnd);wStart.setDate(wStart.getDate()-6);
+            const ws=wStart.toISOString().slice(0,10),we=wEnd.toISOString().slice(0,10);
+            const wr=quizResults.filter(r=>r.date>=ws&&r.date<=we);
+            const avg=wr.length>0?Math.round(wr.reduce((s,r)=>s+(r.score/r.total)*100,0)/wr.length):null;
+            weeklyTrend.push({label:`${wEnd.getDate()}/${wEnd.getMonth()+1}`,avg,count:wr.length});
+          }
+          // ── Heatmap 90 dias ──
+          const heatDays=[];
+          for(let i=89;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);const hrs=hoursLogs.filter(l=>l.date===ds).reduce((s,l)=>s+l.hours,0);heatDays.push({date:ds,hrs});}
+          // ── Interleaving esta semana ──
+          const wkStart=new Date();wkStart.setDate(wkStart.getDate()-wkStart.getDay());
+          const wkStr=wkStart.toISOString().slice(0,10);
+          const thisWeekAreas=[...new Set(hoursLogs.filter(l=>l.date>=wkStr).map(l=>l.category))];
+          const intScore=Math.min(100,Math.round((thisWeekAreas.length/AREAS.length)*100));
+          return(
+            <div style={{display:'flex',flexDirection:'column',gap:'1.25rem'}}>
+              <PageHeader title="Progresso" sub="Indicadores de evolução baseados em neurociência"/>
+              {/* ── Hero metrics ── */}
+              <div className="g4">
+                {[
+                  {label:'Streak',val:streak+'d',sub:'dias consecutivos',icon:'ti-flame',color:streak>=7?'#F87171':streak>=3?'#FBBF24':'#6b6b85',bg:streak>=7?'#2d1010':streak>=3?'#2d2410':'#12121a'},
+                  {label:'Revisões no prazo',val:compliance+'%',sub:`${duePast.filter(c=>c.done).length}/${duePast.length} feitas`,icon:'ti-clock-check',color:compliance>=80?'#34C98A':compliance>=60?'#FBBF24':'#F87171',bg:compliance>=80?'#0d2218':compliance>=60?'#2d2410':'#2d1010'},
+                  {label:'Tópicos dominados',val:dominated,sub:`de ${topics.length} total`,icon:'ti-trophy',color:'#9D95E8',bg:'#1c1838'},
+                  {label:'Score médio',val:avgScore!=null?avgScore+'%':'—',sub:'últimas 20 tentativas',icon:'ti-chart-line',color:avgScore>=80?'#34C98A':avgScore>=60?'#FBBF24':avgScore!=null?'#F87171':'#6b6b85',bg:avgScore>=80?'#0d2218':avgScore>=60?'#2d2410':avgScore!=null?'#2d1010':'#12121a'},
+                ].map(m=>(
+                  <div key={m.label} className="met" style={{borderLeft:`3px solid ${m.color}`,background:m.bg}}>
+                    <div style={{fontSize:11,color:'#6b6b85',marginBottom:4}}><i className={`ti ${m.icon}`} style={{marginRight:4}}/>{m.label}</div>
+                    <div style={{fontSize:26,fontWeight:700,color:m.color}}>{m.val}</div>
+                    <div style={{fontSize:10,color:'#6b6b85',marginTop:2}}>{m.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Maturidade por área ── */}
+              <div className="card">
+                <div className="st">🧠 Maturidade dos tópicos por área</div>
+                <div style={{display:'flex',gap:14,marginBottom:14,flexWrap:'wrap'}}>
+                  {Object.entries(stageL).map(([k,l])=>(
+                    <div key={k} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#8b8baa'}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:stageC[k]}}/>
+                      {l}
+                    </div>
+                  ))}
+                </div>
+                {AREAS.map(area=>{
+                  const aT=topics.filter(t=>t.area===area.id);
+                  if(!aT.length)return null;
+                  const st={novo:0,aprendendo:0,consolidando:0,dominado:0};
+                  aT.forEach(t=>st[getStage(t.repetitions||0)]++);
+                  const domPct=Math.round((st.dominado/aT.length)*100);
+                  return(
+                    <div key={area.id} style={{marginBottom:14}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                        <div style={{display:'flex',alignItems:'center',gap:7}}>
+                          <i className={`ti ${area.icon}`} style={{color:area.color,fontSize:14}}/>
+                          <span style={{fontSize:12,fontWeight:600,color:area.text}}>{area.label}</span>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <div style={{display:'flex',gap:8}}>
+                            {Object.entries(st).filter(([,v])=>v>0).map(([k,v])=>(
+                              <span key={k} style={{fontSize:10,color:stageC[k]}}>{v} {stageL[k].toLowerCase()}</span>
+                            ))}
+                          </div>
+                          <span style={{fontSize:11,color:domPct>=50?'#34C98A':'#6b6b85',fontWeight:600}}>{domPct}%</span>
+                        </div>
+                      </div>
+                      <div style={{display:'flex',height:12,borderRadius:6,overflow:'hidden',gap:1,background:'#12121a'}}>
+                        {Object.entries(st).map(([k,v])=>v>0?(
+                          <div key={k} title={`${stageL[k]}: ${v}`} style={{flex:v,background:stageC[k],transition:'flex 0.4s',minWidth:3}}/>
+                        ):null)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ── Retenção trend SVG ── */}
+              {quizResults.length>=3&&(()=>{
+                const valid=weeklyTrend.filter(w=>w.avg!=null);
+                if(valid.length<2)return null;
+                const W=560,H=160,pL=36,pR=12,pT=16,pB=30;
+                const pts=weeklyTrend.map((w,i)=>{
+                  const x=pL+(i/(weeklyTrend.length-1))*(W-pL-pR);
+                  const y=w.avg!=null?pT+(1-w.avg/100)*(H-pT-pB):null;
+                  return{...w,x,y};
+                });
+                const vPts=pts.filter(p=>p.y!=null);
+                const linePath=vPts.reduce((acc,p,i,arr)=>{
+                  if(i===0)return`M${p.x},${p.y}`;
+                  const prev=arr[i-1];const cpx=(prev.x+p.x)/2;
+                  return acc+` C${cpx},${prev.y} ${cpx},${p.y} ${p.x},${p.y}`;
+                },'');
+                const fillPath=linePath+` L${vPts.at(-1).x},${H-pB} L${vPts[0].x},${H-pB} Z`;
+                const diff=vPts.at(-1).avg-vPts[0].avg;
+                return(
+                  <div className="card">
+                    <div className="st">📈 Evolução da retenção — últimas 8 semanas</div>
+                    <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',overflow:'visible'}}>
+                      {[0,25,50,75,100].map(v=>{const y=pT+(1-v/100)*(H-pT-pB);return(<g key={v}><line x1={pL} y1={y} x2={W-pR} y2={y} stroke="#2a2a38" strokeWidth="0.5"/><text x={pL-4} y={y+4} textAnchor="end" fill="#6b6b85" fontSize="9">{v}%</text></g>);})}
+                      <path d={fillPath} fill="#9D95E8" fillOpacity="0.12"/>
+                      <path d={linePath} fill="none" stroke="#9D95E8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      {pts.map((p,i)=>p.y!=null&&(
+                        <g key={i}>
+                          <circle cx={p.x} cy={p.y} r={4} fill="#9D95E8" stroke="#17171f" strokeWidth="2"/>
+                          {p.count>0&&<text x={p.x} y={p.y-9} textAnchor="middle" fill="#c8c4f8" fontSize="9" fontWeight="600">{p.avg}%</text>}
+                          <text x={p.x} y={H-pB+13} textAnchor="middle" fill="#6b6b85" fontSize="8">{p.label}</text>
+                        </g>
+                      ))}
+                    </svg>
+                    <div style={{fontSize:11,color:diff>0?'#34C98A':diff<0?'#F87171':'#6b6b85',textAlign:'center',marginTop:2,fontWeight:600}}>
+                      {diff>0?`▲ +${diff}% de evolução`:`${diff===0?'→ Estável':'▼ '+diff+'% de variação'}`}
+                      <span style={{color:'#6b6b85',fontWeight:400,marginLeft:8}}>{valid.length} semanas com dados</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── Heatmap 90 dias ── */}
+              <div className="card">
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <div className="st" style={{margin:0}}>🗓 Consistência — últimos 90 dias</div>
+                  <span style={{fontSize:11,color:'#9D95E8',fontWeight:600}}>{heatDays.filter(d=>d.hrs>0).length} dias estudados</span>
+                </div>
+                <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                  {heatDays.map((d,i)=>{
+                    const lv=d.hrs===0?0:d.hrs<1?1:d.hrs<2?2:d.hrs<4?3:4;
+                    const bg=['#12121a','#1c1838','#2d2060','#534AB7','#9D95E8'][lv];
+                    return<div key={i} title={`${d.date}: ${d.hrs.toFixed(1)}h`} style={{width:11,height:11,borderRadius:2,background:bg,border:d.date===t0?'1.5px solid #9D95E8':'1.5px solid transparent',cursor:'default',flexShrink:0}}/>;
+                  })}
+                </div>
+                <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center',fontSize:10,color:'#6b6b85'}}>
+                  <span>Menos</span>
+                  {['#12121a','#1c1838','#2d2060','#534AB7','#9D95E8'].map((c,i)=><div key={i} style={{width:11,height:11,borderRadius:2,background:c}}/>)}
+                  <span>Mais</span>
+                </div>
+              </div>
+
+              {/* ── Interleaving + Revisões no prazo ── */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div className="card">
+                  <div className="st">🔀 Interleaving esta semana</div>
+                  <div style={{fontSize:36,fontWeight:700,color:intScore>=60?'#34C98A':intScore>=40?'#FBBF24':'#F87171',lineHeight:1,marginBottom:4}}>{intScore}%</div>
+                  <div style={{fontSize:11,color:'#6b6b85',marginBottom:10}}>{thisWeekAreas.length} de {AREAS.length} áreas estudadas</div>
+                  <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
+                    {AREAS.map(a=>{const active=thisWeekAreas.includes(a.id);return(
+                      <div key={a.id} style={{padding:'3px 9px',borderRadius:20,background:active?a.bg:'#12121a',border:`0.5px solid ${active?a.color:'#2a2a38'}`,fontSize:11,color:active?a.text:'#6b6b85'}}>
+                        <i className={`ti ${a.icon}`} style={{marginRight:4,fontSize:10}}/>{a.label.split(' ')[0]}
+                      </div>);
+                    })}
+                  </div>
+                  <div style={{fontSize:10,color:'#6b6b85',lineHeight:1.5,borderTop:`0.5px solid ${C.bord}`,paddingTop:8}}>Meta: 3+ áreas/semana para máxima retenção por interleaving</div>
+                </div>
+                <div className="card">
+                  <div className="st">⏰ Revisões no prazo por área</div>
+                  {(()=>{
+                    const byArea=AREAS.map(a=>{
+                      const aRows=revRows.filter(r=>r.cat===a.label||r.cat===a.label.split(' ')[0]||r.cat===AREAS.find(x=>x.id===a.id)?.label);
+                      const chks=aRows.flatMap(r=>(r.checks||[]).map((c,i)=>({done:c===1,date:(r.revs||[])[i]})));
+                      const due=chks.filter(c=>c.date&&c.date<=t0);
+                      return{...a,due:due.length,onTime:due.filter(c=>c.done).length};
+                    }).filter(a=>a.due>0);
+                    if(!byArea.length)return<p style={{fontSize:12,color:'#6b6b85'}}>Nenhuma revisão agendada ainda.</p>;
+                    return byArea.map(a=>{
+                      const pct=Math.round((a.onTime/a.due)*100);
+                      return(
+                        <div key={a.id} style={{marginBottom:9}}>
+                          <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:3}}>
+                            <span style={{color:a.text}}><i className={`ti ${a.icon}`} style={{marginRight:4}}/>{a.label.split(' ')[0]}</span>
+                            <span style={{color:pct>=80?'#34C98A':pct>=60?'#FBBF24':'#F87171',fontWeight:600}}>{pct}%</span>
+                          </div>
+                          <div className="pb"><div className="pf" style={{width:`${pct}%`,background:pct>=80?'#34C98A':pct>=60?'#FBBF24':'#F87171'}}/></div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
             </div>
           );
         })()}
