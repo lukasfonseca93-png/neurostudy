@@ -359,6 +359,7 @@ export default function App(){
   const [ultBreakMins,setUltBreakMins]=useState(()=>LS.get("ultBreakMins",20));
   const ultRef=useRef(null);
   const [captureRaw,setCaptureRaw]=useState("");
+  const [topicSearch,setTopicSearch]=useState("");
   const [captureResult,setCaptureResult]=useState(null);
   const [captureLoading,setCaptureLoading]=useState(false);
   const [captureErr,setCaptureErr]=useState(null);
@@ -1868,7 +1869,40 @@ export default function App(){
                 <button className={`atab${orgTab==="topics"?" on":""}`} style={orgTab==="topics"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setOrgTab("topics")}><i className="ti ti-folders" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
                 <button className={`atab${orgTab==="knowledge"?" on":""}`} style={orgTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#34C98A"}:{}} onClick={()=>setOrgTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
               </div>
-              {orgTab==="topics"&&AREAS.map(area=>{
+              {orgTab==="topics"&&(
+                <>
+                  <div style={{position:"relative",marginBottom:4}}>
+                    <i className="ti ti-search" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#6b6b85",fontSize:14,pointerEvents:"none"}}/>
+                    <input
+                      value={topicSearch}
+                      onChange={e=>setTopicSearch(e.target.value)}
+                      placeholder="Buscar tópicos por título, tags ou notas..."
+                      style={{width:"100%",paddingLeft:32,paddingRight:topicSearch?32:12,background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:8,height:36,fontSize:13,color:"#e8e8f2",boxSizing:"border-box"}}
+                    />
+                    {topicSearch&&<button onClick={()=>setTopicSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6b6b85",cursor:"pointer",fontSize:16,padding:"0 4px"}}>×</button>}
+                  </div>
+                  {topicSearch.trim()&&(()=>{
+                    const q=topicSearch.toLowerCase();
+                    const results=topics.filter(t=>
+                      (t.title||"").toLowerCase().includes(q)||
+                      (t.notes||"").toLowerCase().includes(q)||
+                      (t.tags||[]).some(tag=>tag.toLowerCase().includes(q))||
+                      (t.note_content||"").toLowerCase().includes(q)
+                    );
+                    const area=(id)=>AREAS.find(a=>a.id===id)||AREAS[4];
+                    return(
+                      <div>
+                        <div style={{fontSize:11,color:"#6b6b85",marginBottom:8}}>{results.length} resultado{results.length!==1?"s":""} para "{topicSearch}"</div>
+                        {results.length===0&&<div style={{textAlign:"center",padding:"24px",color:"#6b6b85",fontSize:13}}>Nenhum tópico encontrado.</div>}
+                        {results.map(t=>(
+                          <div key={t.id} style={{marginBottom:4}}>
+                            <TopicRow t={t} area={area(t.area)}/>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {!topicSearch.trim()&&AREAS.map(area=>{
                 const isOpen=!collapsedAreas.has(area.id);
                 const aTopics=topics.filter(t=>t.area===area.id);
                 const aFolders=folders[area.id]||[];
@@ -1900,6 +1934,9 @@ export default function App(){
                   </div>
                 );
               })}
+                  })}
+                </>
+              )}
               {orgTab==="knowledge"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
