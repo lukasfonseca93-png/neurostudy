@@ -90,7 +90,7 @@ const SEED_REV_ROWS = [
 ];
 
 function calcRevDates(base){const b=new Date(base+"T12:00:00");return[1,10,30,90,180,360,720,1440].map(d=>{const n=new Date(b);n.setDate(n.getDate()+d);return n.toISOString().slice(0,10);});}
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const fd=(ts)=>{const d=new Date(ts);return`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;};
 const CSS=`
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -1236,7 +1236,7 @@ export default function App(){
         {view==="dashboard"&&(()=>{
           const byArea=AREAS.map(a=>({...a,count:topics.filter(t=>t.area===a.id).length}));
           const totalWeekHrs=Object.values(weekStudy).reduce((a,b)=>a+b,0);
-          const todayStr=new Date().toISOString().slice(0,10);
+          const todayStr=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
           // Daily tasks helpers — operações individuais por row
           const addDTask=()=>{if(!dailyTaskInput.trim())return;const task={id:Date.now()+"",text:dailyTaskInput.trim(),done:false,date:todayStr};const nw=[...dailyTasks,task];setDailyTasks(nw);LS.set("dailyTasks",nw);dbUpsertDTask(task);setDailyTaskInput("");};
           const toggleDTask=(id)=>{const nw=dailyTasks.map(t=>t.id===id?{...t,done:!t.done}:t);setDailyTasks(nw);LS.set("dailyTasks",nw);const upd=nw.find(t=>t.id===id);if(upd)dbUpsertDTask(upd);};
