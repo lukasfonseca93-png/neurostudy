@@ -10,12 +10,18 @@ const AREAS = [
 ];
 const C = {bg:"#0f0f13",surf:"#17171f",card:"#1e1e28",bord:"#2a2a38",text:"#e8e8f2",muted:"#6b6b85",dim:"#12121a"};
 const CAT_STYLE = {
-  "Neuro":    {color:"#9D95E8",bg:"#2a2840",text:"#c8c4f8"},
-  "Bíblia":   {color:"#34C98A",bg:"#1a3028",text:"#7ee8bc"},
-  "Inglês":   {color:"#60A5FA",bg:"#1a2840",text:"#93c5fd"},
-  "Filosofia":{color:"#FBBF24",bg:"#2d2410",text:"#fde68a"},
-  "Geral":    {color:"#F87171",bg:"#2d1a1a",text:"#fca5a5"},
+  "Neuro":       {color:"#9D95E8",bg:"#2a2840",text:"#c8c4f8"},
+  "Neurociências":{color:"#9D95E8",bg:"#2a2840",text:"#c8c4f8"},
+  "Bíblia":      {color:"#34C98A",bg:"#1a3028",text:"#7ee8bc"},
+  "Estudo Bíblico":{color:"#34C98A",bg:"#1a3028",text:"#7ee8bc"},
+  "Inglês":      {color:"#60A5FA",bg:"#1a2840",text:"#93c5fd"},
+  "Livros":      {color:"#F87171",bg:"#2d1a1a",text:"#fca5a5"},
+  "Filosofia":   {color:"#FBBF24",bg:"#2d2410",text:"#fde68a"},
+  "Geral":       {color:"#FBBF24",bg:"#2d2410",text:"#fde68a"},
+  "Área Geral":  {color:"#FBBF24",bg:"#2d2410",text:"#fde68a"},
 };
+// Mapa canônico: area id -> label curto para revisão espaçada
+const CAT_LABEL = {neuro:"Neuro",biblia:"Bíblia",ingles:"Inglês",livros:"Livros",geral:"Geral"};
 const REV_LABELS = ["+1d","+10d","+30d","+90d","+180d","+360d","+720d","+1440d"];
 const EBB_INTERVALS=[1,3,7,14,30,90]; // Ebbinghaus: rep 0→1d, 1→3d, 2→7d, 3→14d, 4→30d, 5+→90d
 const PERIODS = ["semanal","mensal","semestral","anual"];
@@ -688,7 +694,7 @@ export default function App(){
 
   const addTopicToReview=useCallback(async(topic)=>{
     const id="t"+topic.id;if(revRows.find(r=>r.id===id)){alert("Tópico já está na revisão.");return;}
-    const catLabel=AREAS.find(a=>a.id===topic.area)?.label||"Geral";
+    const catLabel=CAT_LABEL[topic.area]||"Geral";
     const row={id,topic:topic.title,cat:catLabel,base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
     setRevRows(p=>[...p.filter(r=>r.id!==id),row]);
     try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
@@ -703,13 +709,13 @@ export default function App(){
   const renameChapter=useCallback(async(bId,chId,newTitle)=>{const book=books.find(b=>b.id===bId);if(!book)return;const ch=(book.chapters||[]).map(c=>c.id===chId?{...c,title:newTitle}:c);setBooks(p=>p.map(b=>b.id===bId?{...b,chapters:ch}:b));try{await sb.from('books').update({chapters:ch,updated_at:new Date().toISOString()}).eq('id',bId);}catch(e){console.error('[updateChapter]',e)}},[books]);
   const addChapterToReview=useCallback(async(book,ch)=>{
     const id="ch_"+ch.id;if(revRows.find(r=>r.id===id)){alert("Capítulo já está na revisão.");return;}
-    const catLabel=AREAS.find(a=>a.id===book.area)?.label||"Geral";
+    const catLabel=CAT_LABEL[book.area]||"Geral";
     const row={id,topic:book.title+" — "+ch.title,cat:catLabel,base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
     setRevRows(p=>[...p.filter(r=>r.id!==id),row]);
     try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
   },[t0,revRows,session]);
 
-  const addBookToReview=useCallback(async(book)=>{const id="book_"+book.id;if(revRows.find(r=>r.id===id)){alert("Livro já está na revisão.");return;}const row={id,topic:book.title+" (Livro)",cat:AREAS.find(a=>a.id===book.area)?.label||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};setRevRows(p=>[...p.filter(r=>r.id!==id),row]);try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}},[t0,revRows]);
+  const addBookToReview=useCallback(async(book)=>{const id="book_"+book.id;if(revRows.find(r=>r.id===id)){alert("Livro já está na revisão.");return;}const row={id,topic:book.title+" (Livro)",cat:CAT_LABEL[book.area]||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};setRevRows(p=>[...p.filter(r=>r.id!==id),row]);try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}},[t0,revRows]);
 
   const addGoal=useCallback(async()=>{const id=Date.now();const goal={id,area:ng.area,title:ng.title,target:Number(ng.target),done:0,unit:ng.unit,period:ng.period,history:[],user_id:session?.user?.id||null};setGoals(p=>[...p,goal]);setModal(null);setNg({area:"neuro",title:"",target:"",unit:"",period:"anual"});try{await sb.from('goals').upsert({...goal,updated_at:new Date().toISOString()});}catch{}},[ng]);
   const updateGoalDone=useCallback(async(id,val)=>{const done=Math.max(0,Number(val));setGoals(p=>p.map(g=>g.id===id?{...g,done}:g));try{await sb.from('goals').update({done,updated_at:new Date().toISOString()}).eq('id',id);}catch{}},[]);
@@ -747,7 +753,7 @@ export default function App(){
     // Auto-add to spaced review
     const revId="t"+id;
     if(!revRows.find(r=>r.id===revId)){
-      const row={id:revId,topic:result.title,cat:{"neuro":"Neuro","biblia":"Bíblia","ingles":"Inglês","livros":"Livros","geral":"Geral"}[result.area]||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
+      const row={id:revId,topic:result.title,cat:CAT_LABEL[result.area]||"Geral",base_date:t0,checks:[0,0,0,0,0,0,0,0],revs:calcRevDates(t0),user_id:session?.user?.id||null};
       setRevRows(p=>[...p,row]);
       try{await sb.from('rev_rows').upsert({...row,updated_at:new Date().toISOString()});}catch{}
     }
@@ -891,8 +897,7 @@ export default function App(){
             {bulkMode&&<input type="checkbox" className="chk" checked={selectedTopics.has(t.id)} onChange={()=>toggleSelectTopic(t.id)} onClick={e=>e.stopPropagation()}/>}
             <i className={`ti ${exp&&!bulkMode?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:13,color:C.muted,flexShrink:0}} aria-hidden/>
             <span style={{fontWeight:500,fontSize:13,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:exp?"normal":"nowrap"}}>{t.title}</span>
-            {isDue&&<span className="bdg" style={{background:"#2d1010",color:"#fca5a5",flexShrink:0}}>Revisar!</span>}
-            {!isDue&&days!==null&&days<=3&&days>=0&&<span className="bdg" style={{background:"#2d2010",color:"#fde68a",flexShrink:0}}>Em {days}d</span>}
+
             {linkedRev&&<span className="bdg" style={{background:"#1a2840",color:"#93c5fd",flexShrink:0}}>Rev.✓</span>}
           </div>
           <div style={{display:"flex",gap:5,marginLeft:8,flexShrink:0}} onClick={e=>e.stopPropagation()}>
@@ -949,7 +954,7 @@ export default function App(){
                 )}
                 <div style={{display:"flex",gap:8,fontSize:11,color:C.muted,marginTop:8}}>
                   <span>Rep #{t.repetitions||0}</span>
-                  <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
+                  
                   <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
                 {/* Consulta de emergência (IA) */}
@@ -982,7 +987,7 @@ export default function App(){
                 })}
                 <div style={{fontSize:11,color:C.muted,display:"flex",gap:10,paddingTop:6,borderTop:`0.5px solid ${C.bord}`}}>
                   <span>Rep #{t.repetitions||0}</span>
-                  <span>Próx: {isDue?"hoje":t.next_review?fd(t.next_review):"—"}</span>
+                  
                   <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
                 {/* Consulta de emergência (IA) */}
@@ -2078,9 +2083,11 @@ export default function App(){
                       return(
                         <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.bord}`}}>
                           <span className="bdg" style={{background:cs.bg,color:cs.text,minWidth:54,justifyContent:"center"}}>{r.cat}</span>
-                          <span style={{flex:1,fontSize:13,fontWeight:500}}>{r.topic}</span>
+                          <span style={{flex:1,fontSize:13,fontWeight:500,cursor:r.id.startsWith("t")?"pointer":"default",color:r.id.startsWith("t")?"#c8c4f8":C.text}}
+                            onClick={()=>{if(r.id.startsWith("t")){const tid=parseInt(r.id.slice(1));const t=topics.find(x=>x.id===tid);if(t){setView("org");setTimeout(()=>setExpanded(tid),100);}}}}
+                          >{r.topic}{r.id.startsWith("t")&&<i className="ti ti-arrow-up-right" style={{fontSize:10,marginLeft:4,opacity:0.6}}/>}</span>
                           <span style={{fontSize:11,color:"#fca5a5"}}>{getNextRev(r)}</span>
-                          {nextIdx>=0&&<button className="btn btn-sm btng" onClick={()=>toggleXlCheck(r.id,nextIdx)}>✓ Feito</button>}
+                          {nextIdx>=0&&<button className="btn btn-sm btng" onClick={()=>toggleXlCheck(r.id,nextIdx)}>+ Feito</button>}
                         </div>
                       );
                     })}
@@ -2089,7 +2096,7 @@ export default function App(){
               )}
               <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                  {["Todas","Neuro","Bíblia","Inglês","Filosofia","Geral"].map(f=>(
+                  {["Todas","Neuro","Bíblia","Inglês","Livros","Geral"].map(f=>(
                     <button key={f} className={`atab${revFilter===f?" on":""}`}
                       style={revFilter===f?{background:CAT_STYLE[f]?.bg||"#1c1838",color:CAT_STYLE[f]?.text||"#9D95E8",borderColor:CAT_STYLE[f]?.color||"#3d3780"}:{}}
                       onClick={()=>setRevFilter(f)}>{f}</button>
@@ -2111,10 +2118,20 @@ export default function App(){
                       const isEdit=editRevRow?.id===r.id;
                       return(
                         <tr key={r.id} style={st==="vencida"?{background:"rgba(248,113,113,0.05)"}:st==="proxima"?{background:"rgba(251,191,36,0.04)"}:{}}>
-                          <td>{isEdit?<input value={editRevRow.topic} onChange={e=>setEditRevRow(p=>({...p,topic:e.target.value}))} style={{fontSize:12,padding:"3px 7px"}}/>:<span style={{fontWeight:500,fontSize:13}}>{r.topic}</span>}</td>
+                          <td>{isEdit
+                            ?<input value={editRevRow.topic} onChange={e=>setEditRevRow(p=>({...p,topic:e.target.value}))} style={{fontSize:12,padding:"3px 7px"}}/>
+                            :<span
+                              style={{fontWeight:500,fontSize:13,cursor:r.id.startsWith("t")?"pointer":"default",color:r.id.startsWith("t")?"#c8c4f8":C.text,display:"flex",alignItems:"center",gap:4}}
+                              onClick={()=>{if(r.id.startsWith("t")){const tid=parseInt(r.id.slice(1));const t=topics.find(x=>x.id===tid);if(t){setView("org");setTimeout(()=>setExpanded(tid),100);}}}}
+                              title={r.id.startsWith("t")?"Clique para abrir o tópico na Organização":""}
+                            >
+                              {r.topic}
+                              {r.id.startsWith("t")&&<i className="ti ti-arrow-up-right" style={{fontSize:10,opacity:0.5}}/>}
+                            </span>
+                          }</td>
                           <td>{isEdit
                             ?<select value={editRevRow.cat} onChange={e=>setEditRevRow(p=>({...p,cat:e.target.value}))} style={{fontSize:12,padding:"3px 7px"}}>
-                              {["Neuro","Bíblia","Inglês","Filosofia","Geral"].map(c=><option key={c}>{c}</option>)}
+                              {["Neuro","Bíblia","Inglês","Livros","Geral"].map(c=><option key={c}>{c}</option>)}
                             </select>
                             :<span className="bdg" style={{background:cs.bg,color:cs.text}}>{r.cat}</span>}
                           </td>
