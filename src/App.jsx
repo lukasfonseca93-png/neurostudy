@@ -329,6 +329,7 @@ export default function App(){
   const [collapsedAreas,setCollapsedAreas]=useState(()=>new Set(LS.get("collapsedAreas",["neuro","biblia","ingles","livros","geral"])));
   const [collapsedFolders,setCollapsedFolders]=useState(()=>new Set(LS.get("collapsedFolders",[])));
   const [expanded,setExpanded]=useState(null);
+  const [pendingExpand,setPendingExpand]=useState(null);
   const [editNotes,setEditNotes]=useState({});
   const [quiz,setQuiz]=useState(null);
   const [qLoad,setQLoad]=useState(false);
@@ -401,6 +402,17 @@ export default function App(){
   useEffect(()=>{if(loaded)LS.set("quizResults",quizResults);},[quizResults,loaded]);
   useEffect(()=>{LS.set("view",view);},[view]);
   useEffect(()=>{LS.set("collapsedAreas",[...collapsedAreas]);},[collapsedAreas]);
+  useEffect(()=>{
+    if(view==="org"&&pendingExpand!==null){
+      const t=topics.find(x=>x.id===pendingExpand);
+      if(t){
+        // Uncollapse the area
+        setCollapsedAreas(p=>{const n=new Set(p);n.delete(t.area);return n;});
+        setExpanded(pendingExpand);
+      }
+      setPendingExpand(null);
+    }
+  },[view,pendingExpand]);
   useEffect(()=>{LS.set("collapsedFolders",[...collapsedFolders]);},[collapsedFolders]);
 
   useEffect(()=>{
@@ -2084,7 +2096,7 @@ export default function App(){
                         <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`0.5px solid ${C.bord}`}}>
                           <span className="bdg" style={{background:cs.bg,color:cs.text,minWidth:54,justifyContent:"center"}}>{r.cat}</span>
                           <span style={{flex:1,fontSize:13,fontWeight:500,cursor:r.id.startsWith("t")?"pointer":"default",color:r.id.startsWith("t")?"#c8c4f8":C.text}}
-                            onClick={()=>{if(r.id.startsWith("t")){const tid=parseInt(r.id.slice(1));const t=topics.find(x=>x.id===tid);if(t){setView("org");setTimeout(()=>setExpanded(tid),100);}}}}
+                            onClick={()=>{if(r.id.startsWith("t")){const tid=parseInt(r.id.slice(1));const t=topics.find(x=>x.id===tid);if(t){setPendingExpand(tid);setView("org");}}}}
                           >{r.topic}{r.id.startsWith("t")&&<i className="ti ti-arrow-up-right" style={{fontSize:10,marginLeft:4,opacity:0.6}}/>}</span>
                           <span style={{fontSize:11,color:"#fca5a5"}}>{getNextRev(r)}</span>
                           {nextIdx>=0&&<button className="btn btn-sm btng" onClick={()=>toggleXlCheck(r.id,nextIdx)}>+ Feito</button>}
@@ -2122,7 +2134,7 @@ export default function App(){
                             ?<input value={editRevRow.topic} onChange={e=>setEditRevRow(p=>({...p,topic:e.target.value}))} style={{fontSize:12,padding:"3px 7px"}}/>
                             :<span
                               style={{fontWeight:500,fontSize:13,cursor:r.id.startsWith("t")?"pointer":"default",color:r.id.startsWith("t")?"#c8c4f8":C.text,display:"flex",alignItems:"center",gap:4}}
-                              onClick={()=>{if(r.id.startsWith("t")){const tid=parseInt(r.id.slice(1));const t=topics.find(x=>x.id===tid);if(t){setView("org");setTimeout(()=>setExpanded(tid),100);}}}}
+                              onClick={()=>{if(r.id.startsWith("t")){const tid=parseInt(r.id.slice(1));const t=topics.find(x=>x.id===tid);if(t){setPendingExpand(tid);setView("org");}}}}
                               title={r.id.startsWith("t")?"Clique para abrir o tópico na Organização":""}
                             >
                               {r.topic}
