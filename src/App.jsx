@@ -2162,7 +2162,15 @@ export default function App(){
                               {isEdit
                                 ?<><button className="btn btn-sm btng" onClick={()=>{saveEditRev(editRevRow);setEditRevRow(null);}}>✓</button>
                                   <button className="btn btn-sm" onClick={()=>setEditRevRow(null)}>✕</button></>
-                                :<><button className="btn btn-sm" onClick={()=>setEditRevRow({...r})}><i className="ti ti-pencil" aria-hidden/></button>
+                                :<><button className="btn btn-sm btnp" title="Gerar quiz deste tópico" onClick={()=>{
+                                    let item=null;
+                                    if(r.id.startsWith("t")){item=topics.find(x=>x.id===parseInt(r.id.slice(1)));}
+                                    else if(r.id.startsWith("book_")){const b=books.find(x=>x.id===parseInt(r.id.slice(5)));if(b)item={...b,title:b.title+" (Livro)",notes:b.notes||""};}
+                                    else if(r.id.startsWith("ch_")){const chId=parseInt(r.id.slice(3));const b=books.find(bk=>(bk.chapters||[]).find(c=>c.id===chId));if(b){const ch=(b.chapters||[]).find(c=>c.id===chId);if(ch)item={id:ch.id,title:ch.title,notes:[ch.resumo,ch.perguntas,ch.insights].filter(Boolean).join("\n")};}}
+                                    else{item={id:r.id,title:r.topic,notes:r.topic};}
+                                    if(item){genQuiz(item);setView("quiz");}
+                                  }}><i className="ti ti-help-circle" aria-hidden/></button>
+                                  <button className="btn btn-sm" onClick={()=>setEditRevRow({...r})}><i className="ti ti-pencil" aria-hidden/></button>
                                   <button className="btn btn-sm btnr" onClick={()=>deleteRevRow(r.id)}><i className="ti ti-trash" aria-hidden/></button></>
                               }
                             </div>
