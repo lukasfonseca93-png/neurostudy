@@ -2,18 +2,18 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { sb } from "./supabase.js";
 
 const AREAS = [
-  { id:"neuro",  label:"Neurociências",  icon:"ti-brain",    color:"#9D95E8", bg:"#2a2840", text:"#c8c4f8" },
-  { id:"biblia", label:"Estudo Bíblico", icon:"ti-book",     color:"#34C98A", bg:"#1a3028", text:"#7ee8bc" },
+  { id:"neuro",  label:"Neurociências",  icon:"ti-brain",    color:"#a99cf6", bg:"#2a2840", text:"#c8c4f8" },
+  { id:"biblia", label:"Estudo Bíblico", icon:"ti-book",     color:"#3ddc97", bg:"#1a3028", text:"#7ee8bc" },
   { id:"ingles", label:"Inglês",         icon:"ti-language", color:"#60A5FA", bg:"#1a2840", text:"#93c5fd" },
   { id:"livros", label:"Livros",         icon:"ti-books",    color:"#F87171", bg:"#2d1a1a", text:"#fca5a5" },
   { id:"geral",  label:"Área Geral",     icon:"ti-school",   color:"#FBBF24", bg:"#2d2410", text:"#fde68a" },
 ];
-const C = {bg:"#0f0f13",surf:"#17171f",card:"#1e1e28",bord:"#2a2a38",text:"#e8e8f2",muted:"#6b6b85",dim:"#12121a"};
+const C = {bg:"#0a0a10",surf:"#10101a",card:"#161622",bord:"#262635",text:"#eaeaf4",muted:"#8b8ba6",dim:"#0e0e16"};
 const CAT_STYLE = {
-  "Neuro":       {color:"#9D95E8",bg:"#2a2840",text:"#c8c4f8"},
-  "Neurociências":{color:"#9D95E8",bg:"#2a2840",text:"#c8c4f8"},
-  "Bíblia":      {color:"#34C98A",bg:"#1a3028",text:"#7ee8bc"},
-  "Estudo Bíblico":{color:"#34C98A",bg:"#1a3028",text:"#7ee8bc"},
+  "Neuro":       {color:"#a99cf6",bg:"#2a2840",text:"#c8c4f8"},
+  "Neurociências":{color:"#a99cf6",bg:"#2a2840",text:"#c8c4f8"},
+  "Bíblia":      {color:"#3ddc97",bg:"#1a3028",text:"#7ee8bc"},
+  "Estudo Bíblico":{color:"#3ddc97",bg:"#1a3028",text:"#7ee8bc"},
   "Inglês":      {color:"#60A5FA",bg:"#1a2840",text:"#93c5fd"},
   "Livros":      {color:"#F87171",bg:"#2d1a1a",text:"#fca5a5"},
   "Filosofia":   {color:"#FBBF24",bg:"#2d2410",text:"#fde68a"},
@@ -100,59 +100,118 @@ const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 const fd=(ts)=>{const d=new Date(ts);return`${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;};
 const CSS=`
   *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{background:#0f0f13;color:#e8e8f2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;}
-  ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:#0f0f13;}::-webkit-scrollbar-thumb{background:#2a2a38;border-radius:3px;}
-  .sb{width:220px;background:#17171f;border-right:0.5px solid #2a2a38;padding:1rem 0.75rem;display:flex;flex-direction:column;gap:2px;position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:10;}
-  .main{margin-left:220px;padding:1.75rem;min-height:100vh;max-width:1300px;}
-  .ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:14px;color:#8b8baa;transition:all 0.15s;border:none;background:none;width:100%;text-align:left;}
-  .ni:hover{background:#1e1e28;color:#e8e8f2;}.ni.on{background:#1c1838;color:#9D95E8;font-weight:600;}.ni i{font-size:17px;}
-  .card{background:#1e1e28;border:0.5px solid #2a2a38;border-radius:12px;padding:1.2rem;}
-  .met{background:#12121a;border:0.5px solid #2a2a38;border-radius:10px;padding:1rem;}
+  :root{
+    --bg:#0a0a10;--surf:#10101a;--card:#161622;--card2:#12121c;--bord:#262635;--bord-soft:rgba(255,255,255,0.06);
+    --text:#eaeaf4;--text2:#b4b4cc;--muted:#8b8ba6;--faint:#666682;
+    --vio:#6f5ff0;--vio-l:#a99cf6;--grn:#3ddc97;--red:#f87171;--amb:#fbbf24;--blu:#60a5fa;
+    --ring:0 0 0 3px rgba(111,95,240,0.22);
+  }
+  html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+  html,body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;font-size:14px;line-height:1.5;}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(820px 520px at 85% -10%,rgba(111,95,240,0.07),transparent 60%),radial-gradient(700px 480px at -10% 110%,rgba(61,220,151,0.04),transparent 60%);}
+  #root{position:relative;z-index:1;}
+  ::selection{background:rgba(111,95,240,0.35);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:#2c2c3c;border-radius:4px;}
+  ::-webkit-scrollbar-thumb:hover{background:#3a3a4e;}
+  h1,h2,h3{letter-spacing:-0.02em;}
+  .sb{width:236px;background:rgba(15,15,24,0.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-right:1px solid var(--bord-soft);padding:1.1rem 0.8rem 1rem;display:flex;flex-direction:column;gap:2px;position:fixed;top:0;left:0;height:100vh;height:100dvh;overflow-y:auto;z-index:50;transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);}
+  .main{margin-left:236px;padding:2rem 2.25rem 3.5rem;min-height:100vh;max-width:1340px;}
+  .main>*{animation:viewIn 0.3s cubic-bezier(0.2,0.7,0.3,1) both;}
+  @keyframes viewIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .logo-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#7c6cf0,#4f46c8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0;box-shadow:0 4px 14px rgba(111,95,240,0.35);}
+  .ni{position:relative;display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:9px;cursor:pointer;font-size:13.5px;font-weight:500;color:var(--muted);transition:background 0.15s,color 0.15s;border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+  .ni:hover{background:rgba(255,255,255,0.04);color:var(--text);}
+  .ni.on{background:linear-gradient(90deg,rgba(111,95,240,0.16),rgba(111,95,240,0.04));color:var(--vio-l);font-weight:600;}
+  .ni.on::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:3px;background:linear-gradient(180deg,#7c6cf0,#4f46c8);}
+  .ni i{font-size:17px;width:20px;text-align:center;}
+  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--bord-soft);border-radius:14px;padding:1.3rem;box-shadow:0 1px 2px rgba(0,0,0,0.3),0 12px 32px -16px rgba(0,0,0,0.5);}
+  .met{background:linear-gradient(180deg,#15151f,#101019);border:1px solid var(--bord-soft);border-radius:12px;padding:1.05rem;transition:border-color 0.2s,transform 0.2s;}
+  .met:hover{border-color:rgba(255,255,255,0.12);}
   .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
   .g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
   .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
-  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:0.5px solid #2a2a38;background:#1e1e28;color:#e8e8f2;cursor:pointer;font-size:13px;transition:all 0.15s;white-space:nowrap;}
-  .btn:hover{border-color:#6b6b85;}.btn:disabled{opacity:0.4;cursor:not-allowed;}
-  .btn-sm{padding:5px 11px!important;font-size:12px!important;}
-  .btnp{background:#1c1838;border-color:#3d3780;color:#9D95E8;}.btnp:hover{background:#221e42;}
-  .btnr{background:#2d1010;border-color:#7f2020;color:#fca5a5;}.btnr:hover{background:#3a1212;}
-  .btng{background:#0d2218;border-color:#1D6B50;color:#34C98A;}.btng:hover{background:#0d2a1e;}
-  .bdg{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:500;}
-  .tag{background:#12121a;color:#6b6b85;font-size:10px;padding:2px 7px;border-radius:20px;border:0.5px solid #2a2a38;}
-  .pb{height:5px;border-radius:3px;background:#2a2a38;overflow:hidden;}.pf{height:100%;border-radius:3px;transition:width 0.4s;}
-  .st{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.09em;color:#6b6b85;margin-bottom:9px;}
-  input:not([type="checkbox"]):not([type="radio"]),textarea,select{background:#12121a;border:0.5px solid #2a2a38;color:#e8e8f2;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;font-family:inherit;transition:border 0.15s;}
-  input:focus,textarea:focus,select:focus{outline:none;border-color:#534AB7;}
-  .ov{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:100;}
-  .mod{background:#17171f;border-radius:14px;padding:1.5rem;width:90%;max-width:560px;border:0.5px solid #2a2a38;max-height:92vh;overflow-y:auto;}
-  .qo{padding:12px 15px;border-radius:8px;border:0.5px solid #2a2a38;cursor:pointer;font-size:13px;transition:all 0.15s;background:#12121a;color:#e8e8f2;text-align:left;width:100%;line-height:1.5;}
-  .qo:hover:not(:disabled){border-color:#534AB7;background:#1a1a30;}.qo:disabled{cursor:default;}
-  .qo.ok{background:#0d2218;border-color:#1D9E75;color:#34C98A;}.qo.no{background:#2d1010;border-color:#7f2020;color:#F87171;}
-  .pc{background:#12121a;border:0.5px solid #2a2a38;border-radius:11px;padding:11px;min-width:215px;max-width:255px;flex-shrink:0;}
-  .pcard{background:#1e1e28;border:0.5px solid #2a2a38;border-radius:7px;padding:10px 12px;font-size:13px;cursor:grab;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;line-height:1.5;overflow:hidden;min-width:0;}
-  .atab{padding:7px 14px;border-radius:7px;border:0.5px solid #2a2a38;background:#12121a;color:#6b6b85;cursor:pointer;font-size:13px;transition:all 0.15s;}.atab.on{font-weight:500;}
-  table{border-collapse:collapse;width:100%;}th,td{padding:9px 11px;font-size:13px;}
-  th{color:#6b6b85;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;background:#12121a;border-bottom:0.5px solid #2a2a38;}
-  tr:not(:last-child) td{border-bottom:0.5px solid #2a2a38;}tr:nth-child(even) td{background:#12121a;}
-  .area-header{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;cursor:pointer;border:0.5px solid #2a2a38;background:#12121a;transition:background 0.15s;margin-bottom:4px;}
-  .area-header:hover{background:#1e1e28;}
-  .folder-header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;cursor:pointer;background:#17171f;border:0.5px solid #2a2a38;margin-bottom:3px;transition:background 0.15s;}
-  .folder-header:hover{background:#1e1e28;}
-  .inline-edit{background:transparent;border:0.5px solid transparent;border-radius:6px;padding:8px 4px;font-size:13px;line-height:1.8;color:#b0b0c8;resize:vertical;width:100%;min-height:80px;font-family:inherit;}
-  .inline-edit:hover{border-color:#2a2a38;background:#0f0f13;}
-  .inline-edit:focus{border-color:#534AB7;background:#0f0f13;outline:none;color:#e8e8f2;}
-  .title-inline{background:transparent;border:none;border-bottom:1px solid transparent;color:#e8e8f2;font-size:15px;font-weight:600;padding:4px 0;width:100%;font-family:inherit;transition:border-color 0.15s;}
-  .title-inline:focus{outline:none;border-bottom-color:#534AB7;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;border:1px solid var(--bord);background:rgba(255,255,255,0.03);color:var(--text2);cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;transition:all 0.15s;white-space:nowrap;}
+  .btn:hover{border-color:#3c3c50;background:rgba(255,255,255,0.06);color:var(--text);}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn:focus-visible{outline:none;box-shadow:var(--ring);}
+  .btn-sm{padding:4px 10px!important;font-size:12px!important;border-radius:7px!important;}
+  .btnp{background:linear-gradient(135deg,#7c6cf0,#5a4be0);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 2px 10px rgba(111,95,240,0.28);}
+  .btnp:hover{background:linear-gradient(135deg,#8a7bf4,#6657e8);border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(111,95,240,0.4);}
+  .btnr{background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.25);color:#fca5a5;}
+  .btnr:hover{background:rgba(248,113,113,0.14);border-color:rgba(248,113,113,0.45);color:#fecaca;}
+  .btng{background:rgba(61,220,151,0.08);border-color:rgba(61,220,151,0.25);color:#3ddc97;}
+  .btng:hover{background:rgba(61,220,151,0.14);border-color:rgba(61,220,151,0.45);}
+  .bdg{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.02em;}
+  .tag{background:rgba(255,255,255,0.04);color:var(--muted);font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;border:1px solid var(--bord-soft);}
+  .pb{height:6px;border-radius:4px;background:rgba(255,255,255,0.06);overflow:hidden;}
+  .pf{height:100%;border-radius:4px;transition:width 0.5s cubic-bezier(0.4,0,0.2,1);}
+  .st{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--faint);margin-bottom:10px;}
+  input:not([type="checkbox"]):not([type="radio"]),textarea,select{background:#0d0d15;border:1px solid var(--bord);color:var(--text);border-radius:9px;padding:9px 12px;font-size:13px;width:100%;font-family:inherit;transition:border-color 0.15s,box-shadow 0.15s;}
+  input::placeholder,textarea::placeholder{color:#56566e;}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--vio);box-shadow:var(--ring);}
+  select{appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%238b8ba6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>');background-repeat:no-repeat;background-position:right 10px center;padding-right:30px;}
+  .ov{position:fixed;inset:0;background:rgba(5,5,11,0.7);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:100;animation:fadeIn 0.18s ease both;}
+  .mod{background:#13131e;border-radius:16px;padding:1.6rem;width:92%;max-width:580px;border:1px solid var(--bord);max-height:92vh;overflow-y:auto;box-shadow:0 32px 80px -16px rgba(0,0,0,0.7);animation:modIn 0.22s cubic-bezier(0.2,0.8,0.3,1.05) both;}
+  @keyframes modIn{from{opacity:0;transform:translateY(14px) scale(0.97);}to{opacity:1;transform:none;}}
+  .qo{padding:13px 16px;border-radius:10px;border:1px solid var(--bord);cursor:pointer;font-size:13.5px;transition:all 0.15s;background:#0e0e17;color:var(--text);text-align:left;width:100%;line-height:1.55;font-family:inherit;}
+  .qo:hover:not(:disabled){border-color:var(--vio);background:#15152a;transform:translateX(2px);}
+  .qo:disabled{cursor:default;}
+  .qo.ok{background:rgba(61,220,151,0.09);border-color:rgba(61,220,151,0.45);color:#3ddc97;}
+  .qo.no{background:rgba(248,113,113,0.08);border-color:rgba(248,113,113,0.4);color:#f87171;}
+  .pc{background:#101019;border:1px solid var(--bord-soft);border-radius:12px;padding:11px;min-width:215px;max-width:255px;flex-shrink:0;}
+  .pcard{background:#181824;border:1px solid var(--bord-soft);border-radius:9px;padding:10px 12px;font-size:13px;cursor:grab;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;line-height:1.5;overflow:hidden;min-width:0;transition:border-color 0.15s;}
+  .pcard:hover{border-color:rgba(255,255,255,0.14);}
+  .atab{padding:7px 15px;border-radius:8px;border:1px solid var(--bord);background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;transition:all 0.15s;}
+  .atab:hover{color:var(--text);border-color:#3c3c50;}
+  .atab.on{font-weight:600;}
+  table{border-collapse:collapse;width:100%;}
+  th,td{padding:10px 12px;font-size:13px;}
+  th{color:var(--faint);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;background:transparent;border-bottom:1px solid var(--bord);}
+  tr:not(:last-child) td{border-bottom:1px solid rgba(255,255,255,0.045);}
+  tbody tr{transition:background 0.12s;}
+  tbody tr:hover td{background:rgba(255,255,255,0.02);}
+  .area-header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:11px;cursor:pointer;border:1px solid var(--bord-soft);background:#10101a;transition:background 0.15s,border-color 0.15s;margin-bottom:5px;}
+  .area-header:hover{background:#15151f;border-color:rgba(255,255,255,0.12);}
+  .folder-header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;cursor:pointer;background:#12121c;border:1px solid var(--bord-soft);margin-bottom:3px;transition:background 0.15s;}
+  .folder-header:hover{background:#181824;}
+  .inline-edit{background:transparent;border:1px solid transparent;border-radius:8px;padding:8px 6px;font-size:13px;line-height:1.8;color:var(--text2);resize:vertical;width:100%;min-height:80px;font-family:inherit;}
+  .inline-edit:hover{border-color:var(--bord);background:#0c0c13;}
+  .inline-edit:focus{border-color:var(--vio);background:#0c0c13;outline:none;color:var(--text);box-shadow:var(--ring);}
+  .title-inline{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font-size:15px;font-weight:600;padding:4px 0;width:100%;font-family:inherit;transition:border-color 0.15s;}
+  .title-inline:focus{outline:none;border-bottom-color:var(--vio);}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .chk{width:16px;height:16px;accent-color:#9D95E8;cursor:pointer;flex-shrink:0;margin-right:2px;}
-  .bulk-bar{position:sticky;top:0;z-index:20;background:#1c1838;border:0.5px solid #3d3780;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
-  .bulk-cnt{font-size:13px;color:#9D95E8;font-weight:600;flex:1;}
+  .spinner{width:30px;height:30px;border-radius:50%;border:3px solid #23232f;border-top-color:#7c6cf0;animation:spin 0.8s linear infinite;}
+  .chk{width:16px;height:16px;accent-color:#7c6cf0;cursor:pointer;flex-shrink:0;margin-right:2px;}
+  .bulk-bar{position:sticky;top:0;z-index:20;background:rgba(29,25,54,0.92);backdrop-filter:blur(10px);border:1px solid rgba(111,95,240,0.35);border-radius:11px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .bulk-cnt{font-size:13px;color:var(--vio-l);font-weight:600;flex:1;}
+  .toast{position:fixed;top:14px;right:16px;display:flex;align-items:center;gap:7px;background:#11221b;color:#3ddc97;padding:8px 14px;font-size:12px;font-weight:500;border-radius:10px;border:1px solid rgba(61,220,151,0.3);z-index:300;box-shadow:0 8px 24px rgba(0,0,0,0.4);animation:toastIn 0.25s cubic-bezier(0.2,0.8,0.3,1.05) both;}
+  @keyframes toastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+  .menu-btn{display:none;}
+  .sb-scrim{display:none;}
+  @media(max-width:920px){
+    .sb{transform:translateX(-100%);width:264px;box-shadow:0 0 60px rgba(0,0,0,0.6);}
+    .sb.open{transform:none;}
+    .sb-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:40;animation:fadeIn 0.2s both;}
+    .menu-btn{display:flex;align-items:center;justify-content:center;position:fixed;top:12px;left:12px;z-index:60;width:42px;height:42px;border-radius:12px;background:rgba(17,17,28,0.92);backdrop-filter:blur(10px);border:1px solid var(--bord);color:var(--text);font-size:20px;cursor:pointer;}
+    .main{margin-left:0;padding:4.4rem 1rem 5rem;}
+    .g4{grid-template-columns:repeat(2,1fr);}
+  }
+  @media(max-width:560px){
+    .main{padding:4.4rem 0.8rem 5rem;}
+    .g4{gap:9px;}
+    .mod{padding:1.2rem;width:94%;}
+  }
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;}}
 `;
 
 function PageHeader({title,sub,btn,extra}){
   return(
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.25rem",flexWrap:"wrap",gap:8}}>
-      <div><h1 style={{fontSize:20,fontWeight:600,marginBottom:2}}>{title}</h1>{sub&&<p style={{fontSize:12,color:C.muted}}>{sub}</p>}</div>
+      <div><h1 style={{fontSize:22,fontWeight:700,marginBottom:3}}>{title}</h1>{sub&&<p style={{fontSize:12.5,color:C.muted}}>{sub}</p>}</div>
       <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>
         {extra}{btn&&<button className="btn btnp" onClick={btn.fn}><i className={`ti ${btn.icon}`} aria-hidden/>{btn.label}</button>}
       </div>
@@ -264,31 +323,38 @@ function AuthScreen(){
     finally{setLoading(false);}
   };
   return(
-    <div style={{minHeight:"100vh",background:"#0f0f13",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"}}>
-      <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:16,padding:"2.5rem 2rem",width:"100%",maxWidth:400,boxShadow:"0 20px 60px #00000060"}}>
-        <div style={{textAlign:"center",marginBottom:"2rem"}}>
-          <div style={{fontSize:36,marginBottom:8}}>🧠</div>
-          <h1 style={{color:"#e8e8f2",fontSize:22,fontWeight:700,margin:0}}>NeuroStudy</h1>
-          <p style={{color:"#6b6b85",fontSize:13,marginTop:6}}>{mode==="login"?"Entre para acessar seus estudos":"Crie sua conta gratuita"}</p>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"1.5rem"}}>
+      <style>{CSS}</style>
+      <div style={{width:"100%",maxWidth:400,animation:"modIn 0.35s cubic-bezier(0.2,0.8,0.3,1.05) both"}}>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:"1.75rem"}}>
+          <div className="logo-mark" style={{width:52,height:52,borderRadius:14,fontSize:28,marginBottom:14}}><i className="ti ti-brain" aria-hidden/></div>
+          <h1 style={{color:"var(--text)",fontSize:24,fontWeight:700,margin:0}}>NeuroStudy</h1>
+          <p style={{color:"var(--muted)",fontSize:13.5,marginTop:6,textAlign:"center"}}>{mode==="login"?"Estude com a memória a seu favor.":"Crie sua conta para começar."}</p>
         </div>
-        <form onSubmit={handle} style={{display:"flex",flexDirection:"column",gap:12}}>
-          <input type="email" placeholder="Seu e-mail" value={email} onChange={e=>setEmail(e.target.value)}
-            style={{background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:9,padding:"11px 14px",color:"#e8e8f2",fontSize:14,outline:"none",fontFamily:"inherit"}}/>
-          <input type="password" placeholder="Senha (mín. 6 caracteres)" value={pw} onChange={e=>setPw(e.target.value)}
-            style={{background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:9,padding:"11px 14px",color:"#e8e8f2",fontSize:14,outline:"none",fontFamily:"inherit"}}/>
-          {err&&<div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"9px 12px",color:"#fca5a5",fontSize:13}}>{err}</div>}
-          {msg&&<div style={{background:"#0d2218",border:"0.5px solid #1D6B50",borderRadius:8,padding:"9px 12px",color:"#34C98A",fontSize:13}}>{msg}</div>}
-          <button type="submit" disabled={loading}
-            style={{background:"#534AB7",border:"none",borderRadius:9,padding:"12px",color:"#fff",fontSize:15,fontWeight:600,cursor:loading?"not-allowed":"pointer",opacity:loading?0.7:1,fontFamily:"inherit",marginTop:4}}>
-            {loading?"Aguarde...":(mode==="login"?"Entrar":"Criar conta")}
-          </button>
-        </form>
+        <div style={{background:"linear-gradient(180deg,#15151f,#10101a)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:18,padding:"1.75rem 1.5rem",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+          <form onSubmit={handle} style={{display:"flex",flexDirection:"column",gap:12}}>
+            <div>
+              <label style={{display:"block",fontSize:11.5,fontWeight:600,color:"var(--muted)",marginBottom:5,letterSpacing:"0.02em"}}>E-mail</label>
+              <input type="email" placeholder="voce@exemplo.com" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:11.5,fontWeight:600,color:"var(--muted)",marginBottom:5,letterSpacing:"0.02em"}}>Senha</label>
+              <input type="password" placeholder="Mínimo de 6 caracteres" value={pw} onChange={e=>setPw(e.target.value)} autoComplete={mode==="login"?"current-password":"new-password"}/>
+            </div>
+            {err&&<div style={{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:9,padding:"9px 12px",color:"#fca5a5",fontSize:13}}>{err}</div>}
+            {msg&&<div style={{background:"rgba(61,220,151,0.08)",border:"1px solid rgba(61,220,151,0.3)",borderRadius:9,padding:"9px 12px",color:"#3ddc97",fontSize:13}}>{msg}</div>}
+            <button type="submit" disabled={loading} className="btn btnp" style={{justifyContent:"center",padding:"11px",fontSize:14.5,marginTop:4}}>
+              {loading?"Aguarde...":(mode==="login"?"Entrar":"Criar conta")}
+            </button>
+          </form>
+        </div>
         <div style={{textAlign:"center",marginTop:"1.25rem"}}>
           <button onClick={()=>{setMode(m=>m==="login"?"signup":"login");setErr(null);setMsg(null);}}
-            style={{background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:13,fontFamily:"inherit",textDecoration:"underline"}}>
-            {mode==="login"?"Não tem conta? Cadastre-se aqui":"Já tem conta? Fazer login"}
+            style={{background:"none",border:"none",color:"var(--vio-l)",cursor:"pointer",fontSize:13,fontWeight:500,fontFamily:"inherit"}}>
+            {mode==="login"?"Não tem conta? Cadastre-se":"Já tem conta? Fazer login"}
           </button>
         </div>
+        <p style={{textAlign:"center",marginTop:"2rem",fontSize:11,color:"var(--faint)"}}>Repetição espaçada · Recuperação ativa · Ciclos ultradianos</p>
       </div>
     </div>
   );
@@ -299,6 +365,7 @@ export default function App(){
   const [authLoading,setAuthLoading]=useState(true);
   const [loaded,setLoaded]=useState(false);
   const [view,setView]=useState(()=>LS.get("view","dashboard"));
+  const [navOpen,setNavOpen]=useState(false);
   const [aArea,setAArea]=useState("neuro");
   const [orgTab,setOrgTab]=useState("topics");
   const [topics,setTopics]=useState(()=>LS.get("topics",[]));
@@ -490,7 +557,7 @@ export default function App(){
         if(hl.data?.length>0){const logs=hl.data.map(l=>({id:l.id,date:l.date,hours:l.hours,category:l.category}));setHoursLogs(logs);LS.set("hoursLogs",logs);}
         if(dt.data?.length>0){const tasks=dt.data.map(x=>({id:x.id,text:x.text,done:x.done,date:x.task_date}));setDailyTasks(tasks);LS.set("dailyTasks",tasks);}
         if(qr.data?.length>0){const results=qr.data.map(x=>({id:x.id,topicId:x.topic_id,topicTitle:x.topic_title,date:x.date,score:x.score,total:x.total,area:x.area}));setQuizResults(results);LS.set("quizResults",results);}
-        setSyncMsg("☁️ Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
+        setSyncMsg("Sincronizado");setTimeout(()=>setSyncMsg(null),2500);
       }catch{}
     })();
   },[session]);
@@ -614,7 +681,7 @@ export default function App(){
         const a=assignments[String(t.id)];
         if(a)try{await sb.from('topics').update({area:a.area,folder_id:a.folder_id||null,updated_at:ts}).eq('id',t.id);}catch{}
       }
-      setSyncMsg("✅ "+Object.keys(assignments).length+" tópicos organizados!");setTimeout(()=>setSyncMsg(null),4000);
+      setSyncMsg(Object.keys(assignments).length+" tópicos organizados");setTimeout(()=>setSyncMsg(null),4000);
     }catch(e){alert("Erro: "+e.message);}
     finally{setAutoOrganizing(false);}
   };
@@ -832,7 +899,7 @@ export default function App(){
       const topKw=Object.entries(wFreq).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([w])=>w);
       const scored=sents.map((s,i)=>{const sw=s.toLowerCase().split(/\s+/);const sc=sw.reduce((sum,w)=>sum+(wFreq[w]||0),0)/Math.max(1,sw.length);return{text:s,score:sc+(i===0?3:i<2?1.5:0),idx:i};});
       const top=scored.sort((a,b)=>b.score-a.score).slice(0,5).sort((a,b)=>a.idx-b.idx);
-      const COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A"];const cs=Math.ceil(topKw.length/4);
+      const COLORS=["#a99cf6","#60A5FA","#FBBF24","#3ddc97"];const cs=Math.ceil(topKw.length/4);
       const ramos=COLORS.map((cor,i)=>{const chunk=topKw.slice(i*cs,(i+1)*cs);if(!chunk.length)return null;return{label:chunk[0].charAt(0).toUpperCase()+chunk[0].slice(1),cor,filhos:chunk.slice(1,5)};}).filter(Boolean);
       setTopicAI(p=>({...p,[t.id]:{loading:false,error:null,resumo:top.map(s=>s.text).join(" "),mapa:{centro:t.title,ramos},isOffline:true}}));
     };
@@ -840,21 +907,21 @@ export default function App(){
       if(!mapa?.ramos?.length)return null;
       const W=680,H=460,cx=W/2,cy=H/2;const ramos=mapa.ramos||[];const N=ramos.length;const lines=[];
       ramos.forEach((r,i)=>{const ang=(2*Math.PI/N*i)-Math.PI/2;const bx=cx+140*Math.cos(ang),by=cy+130*Math.sin(ang);
-        lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#9D95E8"}" stroke-width="2.5" opacity="0.6"/>`);
+        lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#a99cf6"}" stroke-width="2.5" opacity="0.6"/>`);
         const tw=Math.min(130,Math.max(70,r.label.length*8));
-        lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#9D95E8"}22" stroke="${r.cor||"#9D95E8"}" stroke-width="1.5"/>`);
-        lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#9D95E8"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
+        lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#a99cf6"}22" stroke="${r.cor||"#a99cf6"}" stroke-width="1.5"/>`);
+        lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#a99cf6"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
         (r.filhos||[]).forEach((f,j)=>{const ns=r.filhos.length;const subAng=ang+(j-(ns-1)/2)*0.42;const sx=bx+95*Math.cos(subAng),sy=by+85*Math.sin(subAng);
-          lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#9D95E8"}" stroke-width="1" opacity="0.35"/>`);
+          lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#a99cf6"}" stroke-width="1" opacity="0.35"/>`);
           const sw=Math.min(100,Math.max(50,f.length*7));
-          lines.push(`<rect x="${sx-sw/2}" y="${sy-10}" width="${sw}" height="20" rx="5" fill="#12121a" stroke="#2a2a38" stroke-width="1"/>`);
+          lines.push(`<rect x="${sx-sw/2}" y="${sy-10}" width="${sw}" height="20" rx="5" fill="#0e0e16" stroke="#262635" stroke-width="1"/>`);
           lines.push(`<text x="${sx}" y="${sy+4}" text-anchor="middle" fill="#a0a0b8" font-size="9.5" font-family="system-ui,sans-serif">${(f||"").substring(0,16)}</text>`);
         });
       });
       const ct=(mapa.centro||"").substring(0,22);const cw=Math.max(90,ct.length*9);
-      lines.push(`<ellipse cx="${cx}" cy="${cy}" rx="${cw/2+12}" ry="22" fill="#1c1838" stroke="#9D95E8" stroke-width="2"/>`);
+      lines.push(`<ellipse cx="${cx}" cy="${cy}" rx="${cw/2+12}" ry="22" fill="#1d1936" stroke="#a99cf6" stroke-width="2"/>`);
       lines.push(`<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#c8c4f8" font-size="12" font-weight="700" font-family="system-ui,sans-serif">${ct}</text>`);
-      return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:#0c0c10;border-radius:12px;border:0.5px solid #2a2a38;">${lines.join("")}</svg>`;
+      return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:#0c0c10;border-radius:12px;border:0.5px solid #262635;">${lines.join("")}</svg>`;
     };
     return(
       <div style={{marginTop:10,borderTop:`0.5px solid ${C.bord}`}}>
@@ -867,7 +934,7 @@ export default function App(){
         {open&&(
           <div style={{padding:"10px 0 4px",display:"flex",flexDirection:"column",gap:10}}>
             <div style={{background:"#2d2010",border:"0.5px solid #5a4010",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#fde68a"}}>
-              ⚠️ <strong>Atenção:</strong> consultar o resumo antes de tentar lembrar compromete a consolidação da memória. Use só se realmente travou.
+              <strong>Atenção:</strong> consultar o resumo antes de tentar lembrar compromete a consolidação da memória. Use só se realmente travou.
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button className="btn btn-sm btnp" onClick={buildOffline} style={{flex:1,justifyContent:"center"}}>
@@ -878,18 +945,18 @@ export default function App(){
                 {ai.loading?"Gerando...":"Resumo com IA"}
               </button>
             </div>
-            {ai.isOffline&&<div style={{fontSize:11,color:"#9D95E8",background:"#1c1838",border:"0.5px solid #3d3780",borderRadius:6,padding:"3px 10px"}}>📝 Gerado offline · frequência de termos</div>}
-            {ai.error&&<div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#fca5a5"}}>⚠️ {ai.error}</div>}
+            {ai.isOffline&&<div style={{fontSize:11,color:"#a99cf6",background:"#1d1936",border:"0.5px solid #4a4193",borderRadius:6,padding:"3px 10px"}}>Gerado offline · frequência de termos</div>}
+            {ai.error&&<div style={{background:"#2a1216",border:"0.5px solid #8a2b2e",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#fca5a5"}}>{ai.error}</div>}
             {ai.resumo&&(
-              <div style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${ai.isOffline?"#9D95E8":"#34C98A"}`,borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
-                <div style={{fontSize:11,color:ai.isOffline?"#9D95E8":"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Resumo</div>
+              <div style={{background:"#10101a",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${ai.isOffline?"#a99cf6":"#3ddc97"}`,borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
+                <div style={{fontSize:11,color:ai.isOffline?"#a99cf6":"#3ddc97",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Resumo</div>
                 <ul style={{margin:0,paddingLeft:16,display:"flex",flexDirection:"column",gap:5}}>
                   {ai.resumo.split(/(?<=[.!?])\s+/).filter(Boolean).map((s,i)=>(<li key={i} style={{fontSize:13,color:C.text,lineHeight:1.7}}>{s}</li>))}
                 </ul>
               </div>
             )}
             {ai.mapa&&<div><div dangerouslySetInnerHTML={{__html:renderMapa(ai.mapa)}}/></div>}
-            {!(t.notes||"").trim()&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"0.5rem"}}>💡 Adicione notas para gerar resumo.</p>}
+            {!(t.notes||"").trim()&&<p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"0.5rem"}}>Adicione notas para gerar resumo.</p>}
           </div>
         )}
       </div>
@@ -903,7 +970,7 @@ export default function App(){
     const linkedRev=revRows.find(r=>r.topic===t.title||r.id==="t"+t.id);
     const ed=editNotes[t.id]||{};
     return(
-      <div style={{background:exp?"#12121a":C.card,border:`0.5px solid ${exp?area.color:C.bord}`,borderRadius:9,overflow:"hidden",marginBottom:3}}>
+      <div style={{background:exp?"#0e0e16":C.card,border:`0.5px solid ${exp?area.color:C.bord}`,borderRadius:9,overflow:"hidden",marginBottom:3}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",cursor:"pointer"}} onClick={()=>!bulkMode&&setExpanded(exp?null:t.id)}>
           <div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}>
             {bulkMode&&<input type="checkbox" className="chk" checked={selectedTopics.has(t.id)} onChange={()=>toggleSelectTopic(t.id)} onClick={e=>e.stopPropagation()}/>}
@@ -932,7 +999,7 @@ export default function App(){
               {[{id:"notes",icon:"ti-notes",l:"Notas"},{id:"fichamento",icon:"ti-file-analytics",l:"Fichamento"},{id:"fonte",icon:"ti-notes-off",l:"Nota Fonte"}].map(tab=>{
                 const active=(topicTab[t.id]||"notes")===tab.id;
                 return(<button key={tab.id} onClick={()=>setTopicTab(p=>({...p,[t.id]:tab.id}))}
-                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?"#3d3780":C.bord}`,background:active?"#1c1838":"transparent",color:active?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
+                  style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",borderRadius:7,border:`0.5px solid ${active?"#4a4193":C.bord}`,background:active?"#1d1936":"transparent",color:active?"#a99cf6":C.muted,fontSize:12,cursor:"pointer",fontWeight:active?600:400}}>
                   <i className={`ti ${tab.icon}`}/>{tab.l}
                 </button>);
               })}
@@ -957,7 +1024,7 @@ export default function App(){
                       {(linkedRev.revs||[]).map((rev,i)=>{
                         const ch=linkedRev.checks||[];const done=ch[i]===1;const vencida=!done&&rev<=t0;
                         return(<button key={i} onClick={()=>toggleXlCheck(linkedRev.id,i)} title={`${REV_LABELS[i]} — ${rev}`}
-                          style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,background:done?"#0d2218":vencida?"#2d1010":"#12121a",color:done?"#34C98A":vencida?"#fca5a5":"#6b6b85",fontWeight:done?600:400}}>
+                          style={{padding:"4px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,background:done?"#0e2419":vencida?"#2a1216":"#0e0e16",color:done?"#3ddc97":vencida?"#fca5a5":"#8b8ba6",fontWeight:done?600:400}}>
                           {REV_LABELS[i]}{done?" ✓":vencida?" !":""}
                         </button>);
                       })}
@@ -967,23 +1034,23 @@ export default function App(){
                 <div style={{display:"flex",gap:8,fontSize:11,color:C.muted,marginTop:8}}>
                   <span>Rep #{t.repetitions||0}</span>
                   
-                  <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
+                  <button style={{marginLeft:"auto",background:"none",border:"none",color:"#a99cf6",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
                 {/* Consulta de emergência (IA) */}
                 <EmergencyAI t={t}/>
               </div>
             )}
             {topicTab[t.id]==="fichamento"&&(
-              <div style={{padding:"12px 14px 16px",display:"flex",flexDirection:"column",gap:10,background:"#0f0f13"}}>
+              <div style={{padding:"12px 14px 16px",display:"flex",flexDirection:"column",gap:10,background:"#0a0a10"}}>
                 {[
-                  {k:"resumo",    l:"📋 Resumo do Tópico",  icon:"ti-notes",       color:"#9D95E8", ph:"Pontos principais, definição, o que é essencial saber..."},
+                  {k:"resumo",    l:"📋 Resumo do Tópico",  icon:"ti-notes",       color:"#a99cf6", ph:"Pontos principais, definição, o que é essencial saber..."},
                   {k:"perguntas", l:"❓ Perguntas-chave",   icon:"ti-help-circle", color:"#60A5FA", ph:"• Que problema este conceito resolve?\n• Qual a ideia central?\n• Como se aplica na prática?"},
-                  {k:"insights",  l:"💡 Insights",          icon:"ti-bulb",        color:"#FBBF24", ph:"• Insight 1: ...\n• Aplicação na minha vida: ...\n• O que mudou na minha visão: ..."},
-                  {k:"conexoes",  l:"🔗 Conexões",          icon:"ti-link",        color:"#34C98A", ph:"• Relaciona com: ...\n• Contrasta com: ...\n• Complementa: ..."},
+                  {k:"insights",  l:"Insights",          icon:"ti-bulb",        color:"#FBBF24", ph:"• Insight 1: ...\n• Aplicação na minha vida: ...\n• O que mudou na minha visão: ..."},
+                  {k:"conexoes",  l:"🔗 Conexões",          icon:"ti-link",        color:"#3ddc97", ph:"• Relaciona com: ...\n• Contrasta com: ...\n• Complementa: ..."},
                 ].map(f=>{
                   const val=(t.fichamento||{})[f.k]||"";
                   return(
-                    <div key={f.k} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
+                    <div key={f.k} style={{background:"#10101a",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
                       <div style={{fontSize:11,color:f.color,fontWeight:600,marginBottom:7,display:"flex",alignItems:"center",gap:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>
                         <i className={`ti ${f.icon}`}/>{f.l}
                       </div>
@@ -1000,23 +1067,23 @@ export default function App(){
                 <div style={{fontSize:11,color:C.muted,display:"flex",gap:10,paddingTop:6,borderTop:`0.5px solid ${C.bord}`}}>
                   <span>Rep #{t.repetitions||0}</span>
                   
-                  <button style={{marginLeft:"auto",background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
+                  <button style={{marginLeft:"auto",background:"none",border:"none",color:"#a99cf6",cursor:"pointer",fontSize:11}} onClick={e=>{e.stopPropagation();genQuiz(t,true);}}>↺ Refazer quiz</button>
                 </div>
                 {/* Consulta de emergência (IA) */}
                 <EmergencyAI t={t}/>
               </div>
             )}
             {topicTab[t.id]==="fonte"&&(
-              <div style={{padding:"12px 14px 16px",display:"flex",flexDirection:"column",gap:10,background:"#0f0f13"}}>
+              <div style={{padding:"12px 14px 16px",display:"flex",flexDirection:"column",gap:10,background:"#0a0a10"}}>
                 {t.note_content?(
                   <>
-                    <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderLeft:"3px solid #34C98A",borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
-                      <div style={{fontSize:11,color:"#34C98A",fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                    <div style={{background:"#10101a",border:"0.5px solid #262635",borderLeft:"3px solid #3ddc97",borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
+                      <div style={{fontSize:11,color:"#3ddc97",fontWeight:600,marginBottom:6,display:"flex",alignItems:"center",gap:5,textTransform:"uppercase",letterSpacing:"0.06em"}}>
                         <i className="ti ti-leaf"/>Nota Original (Obsidian)
                       </div>
                       <div style={{fontSize:12,color:"#a0a0b8",lineHeight:1.8,whiteSpace:"pre-wrap",maxHeight:300,overflowY:"auto"}}>{t.note_content}</div>
                     </div>
-                    <div style={{fontSize:11,color:"#6b6b85",display:"flex",gap:8,alignItems:"center"}}>
+                    <div style={{fontSize:11,color:"#8b8ba6",display:"flex",gap:8,alignItems:"center"}}>
                       <i className="ti ti-info-circle"/>
                       <span>Esta nota é a fonte original que gerou o tópico. O quiz usa ela como referência.</span>
                     </div>
@@ -1025,10 +1092,10 @@ export default function App(){
                     </button>
                   </>
                 ):(
-                  <div style={{textAlign:"center",padding:"24px 0",color:"#6b6b85"}}>
+                  <div style={{textAlign:"center",padding:"24px 0",color:"#8b8ba6"}}>
                     <i className="ti ti-inbox" style={{fontSize:28,display:"block",marginBottom:8}}/>
                     <div style={{fontSize:13,marginBottom:4}}>Nenhuma nota fonte vinculada</div>
-                    <div style={{fontSize:11}}>Use a aba <strong style={{color:"#9D95E8"}}>Captura</strong> para importar uma nota do Obsidian e ela aparecerá aqui automaticamente.</div>
+                    <div style={{fontSize:11}}>Use a aba <strong style={{color:"#a99cf6"}}>Captura</strong> para importar uma nota do Obsidian e ela aparecerá aqui automaticamente.</div>
                   </div>
                 )}
               </div>
@@ -1047,7 +1114,7 @@ export default function App(){
                 const topKw=Object.entries(wFreq).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([w])=>w);
                 const scored=sents.map((s,i)=>{const sw=s.toLowerCase().split(/\s+/);const sc=sw.reduce((sum,w)=>sum+(wFreq[w]||0),0)/Math.max(1,sw.length);return{text:s,score:sc+(i===0?3:i<2?1.5:0),idx:i};});
                 const top=scored.sort((a,b)=>b.score-a.score).slice(0,5).sort((a,b)=>a.idx-b.idx);
-                const COLORS=["#9D95E8","#60A5FA","#FBBF24","#34C98A"];
+                const COLORS=["#a99cf6","#60A5FA","#FBBF24","#3ddc97"];
                 const cs=Math.ceil(topKw.length/4);
                 const ramos=COLORS.map((cor,i)=>{const chunk=topKw.slice(i*cs,(i+1)*cs);if(!chunk.length)return null;return{label:chunk[0].charAt(0).toUpperCase()+chunk[0].slice(1),cor,filhos:chunk.slice(1,5)};}).filter(Boolean);
                 setTopicAI(p=>({...p,[t.id]:{loading:false,error:null,resumo:top.map(s=>s.text).join(" "),mapa:{centro:t.title,ramos},isOffline:true}}));
@@ -1061,26 +1128,26 @@ export default function App(){
                 ramos.forEach((r,i)=>{
                   const ang=(2*Math.PI/N*i)-Math.PI/2;
                   const bx=cx+140*Math.cos(ang),by=cy+130*Math.sin(ang);
-                  lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#9D95E8"}" stroke-width="2.5" opacity="0.6"/>`);
+                  lines.push(`<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="${r.cor||"#a99cf6"}" stroke-width="2.5" opacity="0.6"/>`);
                   const tw=Math.min(130,Math.max(70,r.label.length*8));
-                  lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#9D95E8"}22" stroke="${r.cor||"#9D95E8"}" stroke-width="1.5"/>`);
-                  lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#9D95E8"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
+                  lines.push(`<rect x="${bx-tw/2}" y="${by-14}" width="${tw}" height="28" rx="7" fill="${r.cor||"#a99cf6"}22" stroke="${r.cor||"#a99cf6"}" stroke-width="1.5"/>`);
+                  lines.push(`<text x="${bx}" y="${by+5}" text-anchor="middle" fill="${r.cor||"#a99cf6"}" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${(r.label||"").substring(0,18)}</text>`);
                   (r.filhos||[]).forEach((f,j)=>{
                     const ns=r.filhos.length;const subAng=ang+(j-(ns-1)/2)*0.42;
                     const sx=bx+95*Math.cos(subAng),sy=by+85*Math.sin(subAng);
-                    lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#9D95E8"}" stroke-width="1" opacity="0.35"/>`);
+                    lines.push(`<line x1="${bx}" y1="${by}" x2="${sx}" y2="${sy}" stroke="${r.cor||"#a99cf6"}" stroke-width="1" opacity="0.35"/>`);
                     const sw=Math.min(100,Math.max(50,f.length*7));
-                    lines.push(`<rect x="${sx-sw/2}" y="${sy-10}" width="${sw}" height="20" rx="5" fill="#12121a" stroke="#2a2a38" stroke-width="1"/>`);
+                    lines.push(`<rect x="${sx-sw/2}" y="${sy-10}" width="${sw}" height="20" rx="5" fill="#0e0e16" stroke="#262635" stroke-width="1"/>`);
                     lines.push(`<text x="${sx}" y="${sy+4}" text-anchor="middle" fill="#a0a0b8" font-size="9.5" font-family="system-ui,sans-serif">${(f||"").substring(0,16)}</text>`);
                   });
                 });
                 const ct=(mapa.centro||"").substring(0,22);const cw=Math.max(90,ct.length*9);
-                lines.push(`<ellipse cx="${cx}" cy="${cy}" rx="${cw/2+12}" ry="22" fill="#1c1838" stroke="#9D95E8" stroke-width="2"/>`);
+                lines.push(`<ellipse cx="${cx}" cy="${cy}" rx="${cw/2+12}" ry="22" fill="#1d1936" stroke="#a99cf6" stroke-width="2"/>`);
                 lines.push(`<text x="${cx}" y="${cy+5}" text-anchor="middle" fill="#c8c4f8" font-size="12" font-weight="700" font-family="system-ui,sans-serif">${ct}</text>`);
-                return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:#0c0c10;border-radius:12px;border:0.5px solid #2a2a38;">${lines.join("")}</svg>`;
+                return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;background:#0c0c10;border-radius:12px;border:0.5px solid #262635;">${lines.join("")}</svg>`;
               };
               return(
-                <div style={{padding:"14px",background:"#0f0f13",display:"flex",flexDirection:"column",gap:12}}>
+                <div style={{padding:"14px",background:"#0a0a10",display:"flex",flexDirection:"column",gap:12}}>
                   {/* Botões de ação */}
                   <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                     <button className="btn btn-sm btnp" onClick={buildOffline} style={{flex:1,justifyContent:"center"}}>
@@ -1093,16 +1160,16 @@ export default function App(){
                     </button>
                   </div>
                   {/* Badge offline/IA */}
-                  {ai.isOffline&&<div style={{fontSize:11,color:"#9D95E8",background:"#1c1838",border:"0.5px solid #3d3780",borderRadius:6,padding:"3px 10px",alignSelf:"flex-start"}}>📝 Gerado offline · baseado em frequência de termos</div>}
-                  {ai.resumo&&!ai.isOffline&&<div style={{fontSize:11,color:"#34C98A",background:"#0d2218",border:"0.5px solid #1D6B50",borderRadius:6,padding:"3px 10px",alignSelf:"flex-start"}}>✨ Gerado pela IA (Claude)</div>}
+                  {ai.isOffline&&<div style={{fontSize:11,color:"#a99cf6",background:"#1d1936",border:"0.5px solid #4a4193",borderRadius:6,padding:"3px 10px",alignSelf:"flex-start"}}>Gerado offline · baseado em frequência de termos</div>}
+                  {ai.resumo&&!ai.isOffline&&<div style={{fontSize:11,color:"#3ddc97",background:"#0e2419",border:"0.5px solid #20805d",borderRadius:6,padding:"3px 10px",alignSelf:"flex-start"}}>Gerado por IA · Claude</div>}
                   {ai.error&&(
-                    <div style={{background:"#2d1010",border:"0.5px solid #7f2020",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#fca5a5"}}>
-                      ⚠️ {ai.error} — Verifique a API key no Vercel.
+                    <div style={{background:"#2a1216",border:"0.5px solid #8a2b2e",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#fca5a5"}}>
+                      {ai.error} — Verifique a API key no Vercel.
                     </div>
                   )}
                   {ai.resumo&&(
-                    <div style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${ai.isOffline?"#9D95E8":"#34C98A"}`,borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
-                      <div style={{fontSize:11,color:ai.isOffline?"#9D95E8":"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
+                    <div style={{background:"#10101a",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${ai.isOffline?"#a99cf6":"#3ddc97"}`,borderRadius:"0 8px 8px 0",padding:"12px 14px"}}>
+                      <div style={{fontSize:11,color:ai.isOffline?"#a99cf6":"#3ddc97",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
                         <i className={`ti ${ai.isOffline?"ti-align-left":"ti-sparkles"}`}/>Resumo em Tópicos
                       </div>
                       <ul style={{margin:0,paddingLeft:16,display:"flex",flexDirection:"column",gap:6}}>
@@ -1114,14 +1181,14 @@ export default function App(){
                   )}
                   {ai.mapa&&(
                     <div>
-                      <div style={{fontSize:11,color:"#9D95E8",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
+                      <div style={{fontSize:11,color:"#a99cf6",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em",display:"flex",alignItems:"center",gap:5}}>
                         <i className="ti ti-hierarchy"/>Mapa Mental
                       </div>
                       <div dangerouslySetInnerHTML={{__html:renderMapa(ai.mapa)}}/>
                     </div>
                   )}
                   {!(t.notes||"").trim()&&(
-                    <p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem"}}>💡 Adicione notas na aba "Notas" para gerar resumo e mapa mental.</p>
+                    <p style={{fontSize:12,color:C.muted,textAlign:"center",padding:"1rem"}}>Adicione notas na aba "Notas" para gerar resumo e mapa mental.</p>
                   )}
                 </div>
               );
@@ -1169,8 +1236,9 @@ export default function App(){
 
   // ── Auth guards ──
   if(authLoading) return(
-    <div style={{minHeight:"100vh",background:"#0f0f13",display:"flex",alignItems:"center",justifyContent:"center",color:"#6b6b85",fontFamily:"inherit",fontSize:14}}>
-      <span style={{animation:"spin 1s linear infinite",fontSize:28,display:"block"}}>⟳</span>
+    <div style={{minHeight:"100vh",background:"#0a0a10",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <style>{CSS}</style>
+      <div className="spinner" aria-label="Carregando"/>
     </div>
   );
   if(!session) return <AuthScreen/>;
@@ -1178,24 +1246,29 @@ export default function App(){
   return(
     <>
       <style>{CSS}</style>
-      {syncMsg&&<div style={{position:"fixed",top:8,right:14,background:"#0d2218",color:"#34C98A",padding:"5px 12px",fontSize:11,borderRadius:8,border:"0.5px solid #1D6B50",zIndex:200}}>{syncMsg}</div>}
-      <nav className="sb">
-        <div style={{padding:"8px 4px 14px",borderBottom:`0.5px solid ${C.bord}`,marginBottom:8}}>
-          <div style={{fontWeight:700,fontSize:15,color:"#9D95E8"}}>NeuroStudy</div>
-          <div style={{fontSize:10,color:C.muted,marginTop:2}}>{topics.length} tópicos · {revRows.length} revisões</div>
+      {syncMsg&&<div className="toast"><i className="ti ti-cloud-check" style={{fontSize:14}} aria-hidden/>{syncMsg}</div>}
+      <button className="menu-btn" onClick={()=>setNavOpen(o=>!o)} aria-label="Menu"><i className={`ti ${navOpen?"ti-x":"ti-menu-2"}`} aria-hidden/></button>
+      {navOpen&&<div className="sb-scrim" onClick={()=>setNavOpen(false)}/>}
+      <nav className={`sb${navOpen?" open":""}`}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"4px 4px 14px",borderBottom:`1px solid ${C.bord}`,marginBottom:10}}>
+          <div className="logo-mark"><i className="ti ti-brain" aria-hidden/></div>
+          <div style={{minWidth:0}}>
+            <div style={{fontWeight:700,fontSize:15,letterSpacing:"-0.01em",color:"var(--text)"}}>NeuroStudy</div>
+            <div style={{fontSize:10,color:C.muted,marginTop:1}}>{topics.length} tópicos · {revRows.length} revisões</div>
+          </div>
         </div>
         {NAV.map(n=>(
-          <button key={n.id} className={`ni${view===n.id?" on":""}`} onClick={()=>setView(n.id)}>
+          <button key={n.id} className={`ni${view===n.id?" on":""}`} onClick={()=>{setView(n.id);setNavOpen(false);}}>
             <i className={`ti ${n.icon}`} aria-hidden/>{n.label}
-            {n.id==="review"&&pendentesXl.length>0&&<span className="bdg" style={{background:"#2d1010",color:"#fca5a5",marginLeft:"auto"}}>{pendentesXl.length}</span>}
+            {n.id==="review"&&pendentesXl.length>0&&<span className="bdg" style={{background:"rgba(248,113,113,0.12)",color:"#fca5a5",marginLeft:"auto"}}>{pendentesXl.length}</span>}
           </button>
         ))}
         {/* Timer Ultrádio */}
-        <div style={{margin:"10px 0",padding:"10px 10px 8px",background:ult?ult.mode==='focus'?"#1c1838":"#0d2218":C.dim,borderRadius:10,border:`0.5px solid ${ult?ult.mode==='focus'?"#3d3780":"#1D6B50":C.bord}`}}>
+        <div style={{margin:"10px 0",padding:"10px 10px 8px",background:ult?ult.mode==='focus'?"#1d1936":"#0e2419":C.dim,borderRadius:10,border:`0.5px solid ${ult?ult.mode==='focus'?"#4a4193":"#20805d":C.bord}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{fontSize:13}}>{ult?.mode==='break'?"🌿":"🧠"}</span>
-              <span style={{fontSize:11,fontWeight:600,color:ult?.mode==='break'?"#34C98A":ult?.mode==='focus'?"#9D95E8":C.muted}}>
+              <i className={`ti ${ult?.mode==='break'?"ti-coffee":"ti-brain"}`} style={{fontSize:14,color:ult?.mode==='break'?"#3ddc97":"#a99cf6"}} aria-hidden/>
+              <span style={{fontSize:11,fontWeight:600,color:ult?.mode==='break'?"#3ddc97":ult?.mode==='focus'?"#a99cf6":C.muted}}>
                 {ult?ult.mode==='focus'?"Foco":"Pausa":"Timer Ultrádio"}
               </span>
             </div>
@@ -1203,15 +1276,15 @@ export default function App(){
           </div>
           {ult?(
             <div style={{textAlign:"center"}}>
-              <div style={{fontSize:22,fontWeight:700,color:ult.mode==='focus'?"#9D95E8":"#34C98A",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>
+              <div style={{fontSize:22,fontWeight:700,color:ult.mode==='focus'?"#a99cf6":"#3ddc97",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>
                 {String(Math.floor(ult.secs/60)).padStart(2,"0")}:{String(ult.secs%60).padStart(2,"0")}
               </div>
               <div style={{fontSize:9,color:C.muted,marginBottom:3}}>{ult.mode==='focus'?`${ult.focusMins||ultFocusMins}min foco`:`${ult.breakMins||ultBreakMins}min pausa`}</div>
               <div className="pb" style={{margin:"4px 0 7px"}}>
-                <div className="pf" style={{width:`${ult.mode==='focus'?(1-(ult.secs/((ult.focusMins||ultFocusMins)*60)))*100:(1-(ult.secs/((ult.breakMins||ultBreakMins)*60)))*100}%`,background:ult.mode==='focus'?"#9D95E8":"#34C98A"}}/>
+                <div className="pf" style={{width:`${ult.mode==='focus'?(1-(ult.secs/((ult.focusMins||ultFocusMins)*60)))*100:(1-(ult.secs/((ult.breakMins||ultBreakMins)*60)))*100}%`,background:ult.mode==='focus'?"#a99cf6":"#3ddc97"}}/>
               </div>
               <button onClick={()=>setUlt(u=>({...u,running:!u.running}))} className="btn btn-sm" style={{fontSize:11,padding:"3px 10px",width:"100%",justifyContent:"center"}}>
-                {ult.running?"⏸ Pausar":"▶ Retomar"}
+                <i className={`ti ${ult.running?"ti-player-pause":"ti-player-play"}`} aria-hidden/>{ult.running?"Pausar":"Retomar"}
               </button>
             </div>
           ):(
@@ -1221,17 +1294,17 @@ export default function App(){
                   <div style={{fontSize:9,color:C.muted,marginBottom:2}}>Foco (min)</div>
                   <input type="number" min="5" max="180" step="5" value={ultFocusMins}
                     onChange={e=>{const v=Math.max(5,Number(e.target.value));setUltFocusMins(v);LS.set("ultFocusMins",v);}}
-                    style={{fontSize:13,fontWeight:700,textAlign:"center",padding:"4px 6px",background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:6,color:"#9D95E8",width:"100%"}}/>
+                    style={{fontSize:13,fontWeight:700,textAlign:"center",padding:"4px 6px",background:"#0e0e16",border:`0.5px solid ${C.bord}`,borderRadius:6,color:"#a99cf6",width:"100%"}}/>
                 </div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:9,color:C.muted,marginBottom:2}}>Pausa (min)</div>
                   <input type="number" min="5" max="60" step="5" value={ultBreakMins}
                     onChange={e=>{const v=Math.max(5,Number(e.target.value));setUltBreakMins(v);LS.set("ultBreakMins",v);}}
-                    style={{fontSize:13,fontWeight:700,textAlign:"center",padding:"4px 6px",background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:6,color:"#34C98A",width:"100%"}}/>
+                    style={{fontSize:13,fontWeight:700,textAlign:"center",padding:"4px 6px",background:"#0e0e16",border:`0.5px solid ${C.bord}`,borderRadius:6,color:"#3ddc97",width:"100%"}}/>
                 </div>
               </div>
               <button onClick={()=>setUlt({mode:'focus',secs:ultFocusMins*60,running:true,focusMins:ultFocusMins,breakMins:ultBreakMins})} className="btn btn-sm btnp" style={{fontSize:11,justifyContent:"center"}}>
-                ▶ Iniciar foco
+                <i className="ti ti-player-play" aria-hidden/>Iniciar foco
               </button>
             </div>
           )}
@@ -1239,7 +1312,7 @@ export default function App(){
 
         <div style={{marginTop:"auto",paddingTop:12,borderTop:`0.5px solid ${C.bord}`}}>
           <div style={{fontSize:10,color:C.muted,padding:"4px 9px"}}>{Object.values(weekStudy).reduce((a,b)=>a+b,0).toFixed(1)}h esta semana</div>
-          <div style={{fontSize:11,color:"#6b6b85",padding:"4px 9px 6px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={session.user.email}>
+          <div style={{fontSize:11,color:"#8b8ba6",padding:"4px 9px 6px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={session.user.email}>
             <i className="ti ti-user-circle" style={{marginRight:4}}/>{session.user.email}
           </div>
           <button className="ni" style={{color:"#fca5a5"}} onClick={()=>{if(window.confirm("Sair da conta?"))sb.auth.signOut();}}>
@@ -1298,10 +1371,15 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Dashboard" sub={`Hoje é ${new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})}`}/>
               <div className="g4">
-                {[{label:"Tópicos",val:topics.length,icon:"ti-books",color:"#9D95E8"},{label:"Revisões",val:revRows.length,icon:"ti-calendar-repeat",color:"#34C98A"},{label:"Para revisar",val:pendentesXl.length,icon:"ti-alarm",color:pendentesXl.length>0?"#F87171":"#34C98A"},{label:"Horas/semana",val:totalWeekHrs.toFixed(1),icon:"ti-clock",color:"#60A5FA"}].map(m=>(
-                  <div key={m.label} className="met" style={{borderLeft:`3px solid ${m.color}`}}>
-                    <div style={{fontSize:11,color:C.muted,marginBottom:4}}><i className={`ti ${m.icon}`} style={{marginRight:4}}/>{m.label}</div>
-                    <div style={{fontSize:26,fontWeight:700,color:m.color}}>{m.val}</div>
+                {[{label:"Tópicos",val:topics.length,icon:"ti-books",color:"#a99cf6"},{label:"Revisões",val:revRows.length,icon:"ti-calendar-repeat",color:"#3ddc97"},{label:"Para revisar",val:pendentesXl.length,icon:"ti-alarm",color:pendentesXl.length>0?"#F87171":"#3ddc97"},{label:"Horas/semana",val:totalWeekHrs.toFixed(1),icon:"ti-clock",color:"#60A5FA"}].map(m=>(
+                  <div key={m.label} className="met" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:11,color:C.muted,marginBottom:4,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.label}</div>
+                      <div style={{fontSize:26,fontWeight:700,letterSpacing:"-0.02em",color:"var(--text)",fontVariantNumeric:"tabular-nums"}}>{m.val}</div>
+                    </div>
+                    <div style={{width:38,height:38,borderRadius:10,background:`${m.color}1a`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <i className={`ti ${m.icon}`} style={{fontSize:18,color:m.color}} aria-hidden/>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1309,8 +1387,8 @@ export default function App(){
               {/* Tarefas diárias */}
               <div className="card">
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                  <div className="st" style={{margin:0}}>✅ Tarefas do dia — {new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"short"})}</div>
-                  {(todayTasks.length+pendentesXl.length)>0&&<span style={{fontSize:12,color:doneCnt===todayTasks.length&&pendentesXl.every(r=>(r.checks||[]).find((c,i)=>!c)===undefined)?"#34C98A":C.muted,fontWeight:600}}>{doneCnt}/{todayTasks.length} manuais</span>}
+                  <div className="st" style={{margin:0}}>Tarefas do dia — {new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"short"})}</div>
+                  {(todayTasks.length+pendentesXl.length)>0&&<span style={{fontSize:12,color:doneCnt===todayTasks.length&&pendentesXl.every(r=>(r.checks||[]).find((c,i)=>!c)===undefined)?"#3ddc97":C.muted,fontWeight:600}}>{doneCnt}/{todayTasks.length} manuais</span>}
                 </div>
                 {/* Revisões pendentes como tarefas automáticas */}
                 {pendentesXl.length>0&&(
@@ -1333,15 +1411,15 @@ export default function App(){
                         </div>
                       );
                     })}
-                    {pendentesXl.length>5&&<div style={{fontSize:11,color:C.muted,textAlign:"center",marginTop:4}}>+{pendentesXl.length-5} revisões vencidas — <button onClick={()=>setView("review")} style={{background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>ver todas →</button></div>}
+                    {pendentesXl.length>5&&<div style={{fontSize:11,color:C.muted,textAlign:"center",marginTop:4}}>+{pendentesXl.length-5} revisões vencidas — <button onClick={()=>setView("review")} style={{background:"none",border:"none",color:"#a99cf6",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>ver todas →</button></div>}
                   </div>
                 )}
                 {/* Tarefas manuais */}
                 {todayTasks.length===0&&pendentesXl.length===0&&<p style={{fontSize:13,color:C.muted,marginBottom:12,fontStyle:"italic"}}>Nenhuma tarefa ainda. Adicione sua primeira tarefa do dia!</p>}
                 {todayTasks.map(t=>(
-                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,background:t.done?"#1a1830":"#17171f",borderRadius:8,borderLeft:`3px solid ${t.done?"#9D95E8":C.bord}`,transition:"all 0.2s",cursor:"pointer"}} onClick={()=>toggleDTask(t.id)}>
-                    <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:`2px solid ${t.done?"#9D95E8":C.bord}`,background:t.done?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {t.done&&<i className="ti ti-check" style={{fontSize:12,color:"#0f0f13"}}/>}
+                  <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,background:t.done?"#1a1830":"#10101a",borderRadius:8,borderLeft:`3px solid ${t.done?"#a99cf6":C.bord}`,transition:"all 0.2s",cursor:"pointer"}} onClick={()=>toggleDTask(t.id)}>
+                    <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:`2px solid ${t.done?"#a99cf6":C.bord}`,background:t.done?"#a99cf6":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {t.done&&<i className="ti ti-check" style={{fontSize:12,color:"#0a0a10"}}/>}
                     </div>
                     <span style={{flex:1,fontSize:14,color:t.done?C.muted:C.text,textDecoration:t.done?"line-through":"none",fontWeight:t.done?400:500}}>{t.text}</span>
                     <button onClick={e=>{e.stopPropagation();delDTask(t.id);}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,lineHeight:1,padding:"2px 4px"}}>×</button>
@@ -1378,10 +1456,10 @@ export default function App(){
               {/* Tracker de horas — estilo Forest */}
               <div className="card">
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                  <div className="st" style={{margin:0}}>📊 Histórico de estudos</div>
+                  <div className="st" style={{margin:0}}>Histórico de estudos</div>
                   <div style={{display:"flex",gap:4}}>
                     {[{k:"day",l:"Dias"},{k:"week",l:"Semanas"},{k:"month",l:"Meses"},{k:"year",l:"Anos"}].map(v=>(
-                      <button key={v.k} onClick={()=>setHoursView(v.k)} style={{padding:"4px 12px",borderRadius:20,border:`1px solid ${hoursView===v.k?"#9D95E8":C.bord}`,background:hoursView===v.k?"#1c1838":"transparent",color:hoursView===v.k?"#9D95E8":C.muted,fontSize:12,cursor:"pointer",fontWeight:hoursView===v.k?700:400}}>{v.l}</button>
+                      <button key={v.k} onClick={()=>setHoursView(v.k)} style={{padding:"4px 12px",borderRadius:20,border:`1px solid ${hoursView===v.k?"#a99cf6":C.bord}`,background:hoursView===v.k?"#1d1936":"transparent",color:hoursView===v.k?"#a99cf6":C.muted,fontSize:12,cursor:"pointer",fontWeight:hoursView===v.k?700:400}}>{v.l}</button>
                     ))}
                   </div>
                 </div>
@@ -1389,9 +1467,9 @@ export default function App(){
                 <div style={{display:"flex",alignItems:"flex-end",gap:4,height:120,marginBottom:8,overflowX:"auto",paddingBottom:4}}>
                   {chartData.map((d,i)=>(
                     <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",flex:1,minWidth:hoursView==="day"?28:24,gap:3}}>
-                      <span style={{fontSize:9,color:d.hrs>0?"#9D95E8":C.muted,fontWeight:600}}>{d.hrs>0?d.hrs.toFixed(1):""}</span>
-                      <div style={{width:"100%",background:d.isToday?"#9D95E8":d.hrs>0?"#3d3780":"#1a1a28",borderRadius:"4px 4px 0 0",height:`${Math.max(4,(d.hrs/maxHrs)*90)}px`,transition:"height 0.3s",minHeight:4,position:"relative"}} title={`${d.label}: ${d.hrs.toFixed(1)}h`}/>
-                      <span style={{fontSize:9,color:d.isToday?"#9D95E8":C.muted,textAlign:"center",lineHeight:1.2,transform:"rotate(-30deg)",transformOrigin:"top center",whiteSpace:"nowrap"}}>{d.label}</span>
+                      <span style={{fontSize:9,color:d.hrs>0?"#a99cf6":C.muted,fontWeight:600}}>{d.hrs>0?d.hrs.toFixed(1):""}</span>
+                      <div style={{width:"100%",background:d.isToday?"#a99cf6":d.hrs>0?"#4a4193":"#1a1a28",borderRadius:"4px 4px 0 0",height:`${Math.max(4,(d.hrs/maxHrs)*90)}px`,transition:"height 0.3s",minHeight:4,position:"relative"}} title={`${d.label}: ${d.hrs.toFixed(1)}h`}/>
+                      <span style={{fontSize:9,color:d.isToday?"#a99cf6":C.muted,textAlign:"center",lineHeight:1.2,transform:"rotate(-30deg)",transformOrigin:"top center",whiteSpace:"nowrap"}}>{d.label}</span>
                     </div>
                   ))}
                 </div>
@@ -1399,7 +1477,7 @@ export default function App(){
                 <div style={{borderTop:`0.5px solid ${C.bord}`,paddingTop:12,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={{fontSize:13,color:C.muted,fontWeight:500}}>Registrar hoje:</span>
                   <input type="number" min="0.25" step="0.25" value={hoursInput.h} onChange={e=>setHoursInput(h=>({...h,h:e.target.value}))} placeholder="horas" style={{width:70,fontSize:13,textAlign:"center"}} onKeyDown={e=>e.key==="Enter"&&addHoursLog()}/>
-                  <select value={hoursInput.cat} onChange={e=>setHoursInput(h=>({...h,cat:e.target.value}))} style={{fontSize:13,padding:"5px 8px",background:"#17171f",border:`0.5px solid ${C.bord}`,borderRadius:6,color:C.text}}>
+                  <select value={hoursInput.cat} onChange={e=>setHoursInput(h=>({...h,cat:e.target.value}))} style={{fontSize:13,padding:"5px 8px",background:"#10101a",border:`0.5px solid ${C.bord}`,borderRadius:6,color:C.text}}>
                     {AREAS.map(a=><option key={a.id} value={a.id}>{a.label}</option>)}
                   </select>
                   <button className="btn btng" onClick={addHoursLog}><i className="ti ti-plus"/>Registrar</button>
@@ -1444,12 +1522,12 @@ export default function App(){
                 if(retention.length===0)return null;
                 return(
                   <div className="card">
-                    <div className="st">🧠 Saúde de Retenção por Área</div>
+                    <div className="st">Saúde de retenção por área</div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10}}>
                       {retention.map(a=>{
                         const health=a.pct>=80?"ótima":a.pct>=60?"boa":a.pct>=40?"fraca":"crítica";
-                        const hColor=a.pct>=80?"#34C98A":a.pct>=60?"#60A5FA":a.pct>=40?"#FBBF24":"#F87171";
-                        const hBg=a.pct>=80?"#0d2218":a.pct>=60?"#1a2840":a.pct>=40?"#2d2410":"#2d1010";
+                        const hColor=a.pct>=80?"#3ddc97":a.pct>=60?"#60A5FA":a.pct>=40?"#FBBF24":"#F87171";
+                        const hBg=a.pct>=80?"#0e2419":a.pct>=60?"#1a2840":a.pct>=40?"#2d2410":"#2a1216";
                         return(
                           <div key={a.id} style={{background:hBg,borderRadius:10,padding:"12px",border:`0.5px solid ${hColor}33`,display:"flex",flexDirection:"column",gap:6}}>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -1488,7 +1566,7 @@ export default function App(){
                     pendentesXl.slice(0,5).map(r=>{const st=getStatus(r);const cs=CAT_STYLE[r.cat]||CAT_STYLE["Geral"];return(
                       <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:`0.5px solid ${C.bord}`}}>
                         <div><div style={{fontSize:12,fontWeight:500}}>{r.topic}</div><span className="bdg" style={{background:cs.bg,color:cs.text}}>{r.cat}</span></div>
-                        <span className="bdg" style={{background:st==="vencida"?"#2d1010":"#2d2010",color:st==="vencida"?"#fca5a5":"#fde68a"}}>{getNextRev(r)}</span>
+                        <span className="bdg" style={{background:st==="vencida"?"#2a1216":"#2d2010",color:st==="vencida"?"#fca5a5":"#fde68a"}}>{getNextRev(r)}</span>
                       </div>
                     );})}
                   {pendentesXl.length>0&&<button className="btn btn-sm btnp" style={{marginTop:8,width:"100%"}} onClick={()=>setView("review")}>Ver todas →</button>}
@@ -1512,7 +1590,7 @@ export default function App(){
                       {orphans.slice(0,4).map(t=>{
                         const a=AREAS.find(x=>x.id===t.area)||AREAS[4];
                         return(
-                          <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#17171f",borderRadius:8,borderLeft:`3px solid ${a.color}`}}>
+                          <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#10101a",borderRadius:8,borderLeft:`3px solid ${a.color}`}}>
                             <span className="bdg" style={{background:a.bg,color:a.text,flexShrink:0}}>{a.label.split(" ")[0]}</span>
                             <span style={{flex:1,fontSize:13,color:C.text,fontWeight:500}}>{t.title}</span>
                             <button className="btn btn-sm btng" onClick={()=>addTopicToReview(t)} style={{flexShrink:0}}>
@@ -1521,7 +1599,7 @@ export default function App(){
                           </div>
                         );
                       })}
-                      {orphans.length>4&&<div style={{fontSize:11,color:C.muted,textAlign:"center"}}>+{orphans.length-4} tópicos sem revisão — <button onClick={()=>setView("org")} style={{background:"none",border:"none",color:"#9D95E8",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>ver na Organização →</button></div>}
+                      {orphans.length>4&&<div style={{fontSize:11,color:C.muted,textAlign:"center"}}>+{orphans.length-4} tópicos sem revisão — <button onClick={()=>setView("org")} style={{background:"none",border:"none",color:"#a99cf6",cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>ver na Organização →</button></div>}
                     </div>
                   </div>
                 );
@@ -1532,7 +1610,7 @@ export default function App(){
                 <div className="card">
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                     <div className="st" style={{margin:0,display:"flex",alignItems:"center",gap:6}}>
-                      <i className="ti ti-target" style={{color:"#34C98A"}}/>Metas ativas
+                      <i className="ti ti-target" style={{color:"#3ddc97"}}/>Metas ativas
                     </div>
                     <button className="btn btn-sm" onClick={()=>setView("goals")} style={{fontSize:11}}>Gerenciar →</button>
                   </div>
@@ -1568,15 +1646,15 @@ export default function App(){
                 if(readyQuiz.length>0) steps.push({icon:"ti-help-circle",color:"#60A5FA",label:"Fazer quiz de um tópico",count:null,action:()=>setView("quiz"),cta:"Ir para Quiz"});
                 const orphans=topics.filter(t=>!revRows.find(r=>r.id==="t"+t.id||r.topic===t.title));
                 if(orphans.length>0) steps.push({icon:"ti-calendar-plus",color:"#FBBF24",label:"Agendar tópicos para revisão",count:orphans.length,action:()=>setView("org"),cta:"Organização"});
-                steps.push({icon:"ti-inbox",color:"#9D95E8",label:"Capturar novo conteúdo",count:null,action:()=>setView("capture"),cta:"Ir para Captura"});
+                steps.push({icon:"ti-inbox",color:"#a99cf6",label:"Capturar novo conteúdo",count:null,action:()=>setView("capture"),cta:"Ir para Captura"});
                 return(
                   <div className="card">
                     <div className="st" style={{marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
-                      <i className="ti ti-route" style={{color:"#9D95E8"}}/>Fluxo de estudo sugerido para hoje
+                      <i className="ti ti-route" style={{color:"#a99cf6"}}/>Fluxo de estudo sugerido para hoje
                     </div>
                     <div style={{display:"flex",flexDirection:"column",gap:6}}>
                       {steps.map((s,i)=>(
-                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#12121a",borderRadius:8,borderLeft:`3px solid ${s.color}`}}>
+                        <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#0e0e16",borderRadius:8,borderLeft:`3px solid ${s.color}`}}>
                           <div style={{width:22,height:22,borderRadius:"50%",background:s.color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                             <span style={{fontSize:11,fontWeight:700,color:s.color}}>{i+1}</span>
                           </div>
@@ -1597,23 +1675,23 @@ export default function App(){
 
         {view==="capture"&&(()=>{
           const AREA_LABELS={"neuro":"Neurociências","biblia":"Estudo Bíblico","ingles":"Inglês","livros":"Livros","geral":"Área Geral"};
-          const AREA_COLORS={"neuro":"#9D95E8","biblia":"#34C98A","ingles":"#60A5FA","livros":"#F87171","geral":"#FBBF24"};
+          const AREA_COLORS={"neuro":"#a99cf6","biblia":"#3ddc97","ingles":"#60A5FA","livros":"#F87171","geral":"#FBBF24"};
           return(
             <div style={{maxWidth:760,margin:"0 auto",padding:"0 4px 40px"}}>
               {/* Header */}
               <div style={{marginBottom:20}}>
-                <h2 style={{fontSize:20,fontWeight:700,color:"#e8e8f2",margin:0,display:"flex",alignItems:"center",gap:8}}>
-                  <i className="ti ti-inbox" style={{color:"#9D95E8"}}/>Captura Rápida
+                <h2 style={{fontSize:20,fontWeight:700,color:"#eaeaf4",margin:0,display:"flex",alignItems:"center",gap:8}}>
+                  <i className="ti ti-inbox" style={{color:"#a99cf6"}}/>Captura Rápida
                 </h2>
-                <p style={{fontSize:13,color:"#6b6b85",marginTop:4,marginBottom:0}}>
+                <p style={{fontSize:13,color:"#8b8ba6",marginTop:4,marginBottom:0}}>
                   Cole qualquer texto — nota do Obsidian, trecho de livro, insight, artigo — e a IA extrai estrutura e cria um tópico de revisão automático.
                 </p>
               </div>
 
               {/* Input area */}
               {!captureResult&&(
-                <div style={{background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:12,padding:16,marginBottom:16}}>
-                  <div style={{fontSize:12,color:"#6b6b85",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                <div style={{background:"#10101a",border:"0.5px solid #262635",borderRadius:12,padding:16,marginBottom:16}}>
+                  <div style={{fontSize:12,color:"#8b8ba6",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
                     <i className="ti ti-clipboard-text"/>Cole sua nota aqui
                   </div>
                   <textarea
@@ -1621,10 +1699,10 @@ export default function App(){
                     onChange={e=>setCaptureRaw(e.target.value)}
                     placeholder={"Cole aqui:\n• Nota do Obsidian\n• Trecho de livro ou artigo\n• Transcrição de podcast ou aula\n• Seus insights e reflexões\n\nA IA identifica o tema, extrai pontos-chave e cria um tópico pronto para revisão espaçada."}
                     rows={12}
-                    style={{width:"100%",background:"#12121a",border:"0.5px solid #2a2a38",borderRadius:8,padding:"12px",color:"#e8e8f2",fontSize:13,lineHeight:1.8,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box"}}
+                    style={{width:"100%",background:"#0e0e16",border:"0.5px solid #262635",borderRadius:8,padding:"12px",color:"#eaeaf4",fontSize:13,lineHeight:1.8,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box"}}
                   />
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10}}>
-                    <span style={{fontSize:11,color:"#6b6b85"}}>{captureRaw.length>0?captureRaw.length+" chars":""}</span>
+                    <span style={{fontSize:11,color:"#8b8ba6"}}>{captureRaw.length>0?captureRaw.length+" chars":""}</span>
                     <div style={{display:"flex",gap:8}}>
                       {captureRaw.trim()&&<button className="btn btn-sm" onClick={()=>setCaptureRaw("")}>Limpar</button>}
                       <button
@@ -1641,36 +1719,36 @@ export default function App(){
                       </button>
                     </div>
                   </div>
-                  {captureErr&&<div style={{marginTop:10,padding:"8px 12px",background:"#2d1010",borderRadius:8,fontSize:12,color:"#fca5a5"}}>{captureErr}</div>}
+                  {captureErr&&<div style={{marginTop:10,padding:"8px 12px",background:"#2a1216",borderRadius:8,fontSize:12,color:"#fca5a5"}}>{captureErr}</div>}
                 </div>
               )}
 
               {/* Result card */}
               {captureResult&&(
-                <div style={{background:"#17171f",border:"1px solid #3d3780",borderRadius:12,padding:20,marginBottom:16}}>
+                <div style={{background:"#10101a",border:"1px solid #4a4193",borderRadius:12,padding:20,marginBottom:16}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
                     <div>
-                      <div style={{fontSize:11,color:"#9D95E8",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
+                      <div style={{fontSize:11,color:"#a99cf6",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
                         ✦ Nota processada — revise antes de confirmar
                       </div>
-                      <h3 style={{fontSize:18,fontWeight:700,color:"#e8e8f2",margin:0}}>{captureResult.title}</h3>
+                      <h3 style={{fontSize:18,fontWeight:700,color:"#eaeaf4",margin:0}}>{captureResult.title}</h3>
                     </div>
-                    <span style={{padding:"4px 12px",borderRadius:20,fontSize:11,fontWeight:600,background:(AREA_COLORS[captureResult.area]||"#9D95E8")+"22",color:AREA_COLORS[captureResult.area]||"#9D95E8"}}>
+                    <span style={{padding:"4px 12px",borderRadius:20,fontSize:11,fontWeight:600,background:(AREA_COLORS[captureResult.area]||"#a99cf6")+"22",color:AREA_COLORS[captureResult.area]||"#a99cf6"}}>
                       {AREA_LABELS[captureResult.area]||captureResult.area}
                     </span>
                   </div>
 
                   {/* Summary */}
-                  <div style={{background:"#12121a",borderRadius:8,padding:"10px 14px",marginBottom:12,borderLeft:"3px solid #9D95E8"}}>
-                    <div style={{fontSize:11,color:"#9D95E8",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Resumo</div>
+                  <div style={{background:"#0e0e16",borderRadius:8,padding:"10px 14px",marginBottom:12,borderLeft:"3px solid #a99cf6"}}>
+                    <div style={{fontSize:11,color:"#a99cf6",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Resumo</div>
                     <p style={{fontSize:13,color:"#c8c4f8",lineHeight:1.7,margin:0}}>{captureResult.summary}</p>
                   </div>
 
                   {/* Key Points */}
-                  <div style={{background:"#12121a",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
+                  <div style={{background:"#0e0e16",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
                     <div style={{fontSize:11,color:"#60A5FA",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Pontos-chave extraídos</div>
                     {(captureResult.keyPoints||[]).map((p,i)=>(
-                      <div key={i} style={{display:"flex",gap:8,marginBottom:6,fontSize:13,color:"#e8e8f2",lineHeight:1.6}}>
+                      <div key={i} style={{display:"flex",gap:8,marginBottom:6,fontSize:13,color:"#eaeaf4",lineHeight:1.6}}>
                         <span style={{color:"#60A5FA",fontWeight:700,flexShrink:0}}>{i+1}.</span>
                         <span>{p}</span>
                       </div>
@@ -1679,8 +1757,8 @@ export default function App(){
 
                   {/* Connections */}
                   {(captureResult.connections||[]).length>0&&(
-                    <div style={{background:"#12121a",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
-                      <div style={{fontSize:11,color:"#34C98A",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Conexões com outros conceitos</div>
+                    <div style={{background:"#0e0e16",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
+                      <div style={{fontSize:11,color:"#3ddc97",fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Conexões com outros conceitos</div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {(captureResult.connections||[]).map((c,i)=>(
                           <span key={i} style={{padding:"3px 10px",borderRadius:20,background:"#1a3028",color:"#7ee8bc",fontSize:12}}>{c}</span>
@@ -1692,7 +1770,7 @@ export default function App(){
                   {/* Tags */}
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
                     {(captureResult.tags||[]).map((tag,i)=>(
-                      <span key={i} style={{padding:"3px 10px",borderRadius:20,background:"#1e1e28",color:"#6b6b85",border:"0.5px solid #2a2a38",fontSize:11}}># {tag}</span>
+                      <span key={i} style={{padding:"3px 10px",borderRadius:20,background:"#161622",color:"#8b8ba6",border:"0.5px solid #262635",fontSize:11}}># {tag}</span>
                     ))}
                   </div>
 
@@ -1711,15 +1789,15 @@ export default function App(){
               {/* Recent captures */}
               {captureInbox.length>0&&!captureResult&&(
                 <div>
-                  <div style={{fontSize:12,color:"#6b6b85",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{fontSize:12,color:"#8b8ba6",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
                     <i className="ti ti-history"/>Capturas recentes ({captureInbox.length})
                   </div>
                   {captureInbox.slice(0,8).map(entry=>(
-                    <div key={entry.id} style={{background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:8,padding:"10px 14px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div key={entry.id} style={{background:"#10101a",border:"0.5px solid #262635",borderRadius:8,padding:"10px 14px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <div>
-                        <div style={{fontSize:13,color:"#e8e8f2",fontWeight:500}}>{entry.title}</div>
-                        <div style={{fontSize:11,color:"#6b6b85",marginTop:2}}>
-                          <span style={{color:AREA_COLORS[entry.area]||"#6b6b85"}}>{AREA_LABELS[entry.area]||entry.area}</span>
+                        <div style={{fontSize:13,color:"#eaeaf4",fontWeight:500}}>{entry.title}</div>
+                        <div style={{fontSize:11,color:"#8b8ba6",marginTop:2}}>
+                          <span style={{color:AREA_COLORS[entry.area]||"#8b8ba6"}}>{AREA_LABELS[entry.area]||entry.area}</span>
                           {" · "}{new Date(entry.ts).toLocaleDateString("pt-BR",{day:"numeric",month:"short"})}
                         </div>
                       </div>
@@ -1733,8 +1811,8 @@ export default function App(){
 
               {/* Empty state */}
               {captureInbox.length===0&&!captureResult&&!captureRaw&&(
-                <div style={{textAlign:"center",padding:"32px 0",color:"#6b6b85"}}>
-                  <i className="ti ti-plant" style={{fontSize:36,display:"block",marginBottom:12,color:"#34C98A"}}/>
+                <div style={{textAlign:"center",padding:"32px 0",color:"#8b8ba6"}}>
+                  <i className="ti ti-plant" style={{fontSize:36,display:"block",marginBottom:12,color:"#3ddc97"}}/>
                   <div style={{fontSize:14,fontWeight:500,color:"#a0a0b8",marginBottom:6}}>Seu Commonplace Book começa aqui</div>
                   <div style={{fontSize:12,lineHeight:1.7}}>
                     Capture qualquer coisa que aprendeu.<br/>
@@ -1762,7 +1840,7 @@ export default function App(){
           const compliance=duePast.length>0?Math.round(duePast.filter(c=>c.done).length/duePast.length*100):100;
           // ── Maturidade tópicos ──
           const getStage=reps=>reps>=5?'dominado':reps>=3?'consolidando':reps>=1?'aprendendo':'novo';
-          const stageC={novo:'#6b6b85',aprendendo:'#FBBF24',consolidando:'#60A5FA',dominado:'#34C98A'};
+          const stageC={novo:'#8b8ba6',aprendendo:'#FBBF24',consolidando:'#60A5FA',dominado:'#3ddc97'};
           const stageL={novo:'Novo',aprendendo:'Aprendendo',consolidando:'Consolidando',dominado:'Dominado'};
           const dominated=topics.filter(t=>(t.repetitions||0)>=5).length;
           // ── Score médio ──
@@ -1791,22 +1869,22 @@ export default function App(){
               {/* ── Hero metrics ── */}
               <div className="g4">
                 {[
-                  {label:'Streak',val:streak+'d',sub:'dias consecutivos',icon:'ti-flame',color:streak>=7?'#F87171':streak>=3?'#FBBF24':'#6b6b85',bg:streak>=7?'#2d1010':streak>=3?'#2d2410':'#12121a'},
-                  {label:'Revisões no prazo',val:compliance+'%',sub:`${duePast.filter(c=>c.done).length}/${duePast.length} feitas`,icon:'ti-clock-check',color:compliance>=80?'#34C98A':compliance>=60?'#FBBF24':'#F87171',bg:compliance>=80?'#0d2218':compliance>=60?'#2d2410':'#2d1010'},
-                  {label:'Tópicos dominados',val:dominated,sub:`de ${topics.length} total`,icon:'ti-trophy',color:'#9D95E8',bg:'#1c1838'},
-                  {label:'Score médio',val:avgScore!=null?avgScore+'%':'—',sub:'últimas 20 tentativas',icon:'ti-chart-line',color:avgScore>=80?'#34C98A':avgScore>=60?'#FBBF24':avgScore!=null?'#F87171':'#6b6b85',bg:avgScore>=80?'#0d2218':avgScore>=60?'#2d2410':avgScore!=null?'#2d1010':'#12121a'},
+                  {label:'Streak',val:streak+'d',sub:'dias consecutivos',icon:'ti-flame',color:streak>=7?'#F87171':streak>=3?'#FBBF24':'#8b8ba6',bg:streak>=7?'#2a1216':streak>=3?'#2d2410':'#0e0e16'},
+                  {label:'Revisões no prazo',val:compliance+'%',sub:`${duePast.filter(c=>c.done).length}/${duePast.length} feitas`,icon:'ti-clock-check',color:compliance>=80?'#3ddc97':compliance>=60?'#FBBF24':'#F87171',bg:compliance>=80?'#0e2419':compliance>=60?'#2d2410':'#2a1216'},
+                  {label:'Tópicos dominados',val:dominated,sub:`de ${topics.length} total`,icon:'ti-trophy',color:'#a99cf6',bg:'#1d1936'},
+                  {label:'Score médio',val:avgScore!=null?avgScore+'%':'—',sub:'últimas 20 tentativas',icon:'ti-chart-line',color:avgScore>=80?'#3ddc97':avgScore>=60?'#FBBF24':avgScore!=null?'#F87171':'#8b8ba6',bg:avgScore>=80?'#0e2419':avgScore>=60?'#2d2410':avgScore!=null?'#2a1216':'#0e0e16'},
                 ].map(m=>(
                   <div key={m.label} className="met" style={{borderLeft:`3px solid ${m.color}`,background:m.bg}}>
-                    <div style={{fontSize:11,color:'#6b6b85',marginBottom:4}}><i className={`ti ${m.icon}`} style={{marginRight:4}}/>{m.label}</div>
+                    <div style={{fontSize:11,color:'#8b8ba6',marginBottom:4}}><i className={`ti ${m.icon}`} style={{marginRight:4}}/>{m.label}</div>
                     <div style={{fontSize:26,fontWeight:700,color:m.color}}>{m.val}</div>
-                    <div style={{fontSize:10,color:'#6b6b85',marginTop:2}}>{m.sub}</div>
+                    <div style={{fontSize:10,color:'#8b8ba6',marginTop:2}}>{m.sub}</div>
                   </div>
                 ))}
               </div>
 
               {/* ── Maturidade por área ── */}
               <div className="card">
-                <div className="st">🧠 Maturidade dos tópicos por área</div>
+                <div className="st">Maturidade dos tópicos por área</div>
                 <div style={{display:'flex',gap:14,marginBottom:14,flexWrap:'wrap'}}>
                   {Object.entries(stageL).map(([k,l])=>(
                     <div key={k} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#8b8baa'}}>
@@ -1834,10 +1912,10 @@ export default function App(){
                               <span key={k} style={{fontSize:10,color:stageC[k]}}>{v} {stageL[k].toLowerCase()}</span>
                             ))}
                           </div>
-                          <span style={{fontSize:11,color:domPct>=50?'#34C98A':'#6b6b85',fontWeight:600}}>{domPct}%</span>
+                          <span style={{fontSize:11,color:domPct>=50?'#3ddc97':'#8b8ba6',fontWeight:600}}>{domPct}%</span>
                         </div>
                       </div>
-                      <div style={{display:'flex',height:12,borderRadius:6,overflow:'hidden',gap:1,background:'#12121a'}}>
+                      <div style={{display:'flex',height:12,borderRadius:6,overflow:'hidden',gap:1,background:'#0e0e16'}}>
                         {Object.entries(st).map(([k,v])=>v>0?(
                           <div key={k} title={`${stageL[k]}: ${v}`} style={{flex:v,background:stageC[k],transition:'flex 0.4s',minWidth:3}}/>
                         ):null)}
@@ -1867,22 +1945,22 @@ export default function App(){
                 const diff=vPts.at(-1).avg-vPts[0].avg;
                 return(
                   <div className="card">
-                    <div className="st">📈 Evolução da retenção — últimas 8 semanas</div>
+                    <div className="st">Evolução da retenção — últimas 8 semanas</div>
                     <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',overflow:'visible'}}>
-                      {[0,25,50,75,100].map(v=>{const y=pT+(1-v/100)*(H-pT-pB);return(<g key={v}><line x1={pL} y1={y} x2={W-pR} y2={y} stroke="#2a2a38" strokeWidth="0.5"/><text x={pL-4} y={y+4} textAnchor="end" fill="#6b6b85" fontSize="9">{v}%</text></g>);})}
-                      <path d={fillPath} fill="#9D95E8" fillOpacity="0.12"/>
-                      <path d={linePath} fill="none" stroke="#9D95E8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      {[0,25,50,75,100].map(v=>{const y=pT+(1-v/100)*(H-pT-pB);return(<g key={v}><line x1={pL} y1={y} x2={W-pR} y2={y} stroke="#262635" strokeWidth="0.5"/><text x={pL-4} y={y+4} textAnchor="end" fill="#8b8ba6" fontSize="9">{v}%</text></g>);})}
+                      <path d={fillPath} fill="#a99cf6" fillOpacity="0.12"/>
+                      <path d={linePath} fill="none" stroke="#a99cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                       {pts.map((p,i)=>p.y!=null&&(
                         <g key={i}>
-                          <circle cx={p.x} cy={p.y} r={4} fill="#9D95E8" stroke="#17171f" strokeWidth="2"/>
+                          <circle cx={p.x} cy={p.y} r={4} fill="#a99cf6" stroke="#10101a" strokeWidth="2"/>
                           {p.count>0&&<text x={p.x} y={p.y-9} textAnchor="middle" fill="#c8c4f8" fontSize="9" fontWeight="600">{p.avg}%</text>}
-                          <text x={p.x} y={H-pB+13} textAnchor="middle" fill="#6b6b85" fontSize="8">{p.label}</text>
+                          <text x={p.x} y={H-pB+13} textAnchor="middle" fill="#8b8ba6" fontSize="8">{p.label}</text>
                         </g>
                       ))}
                     </svg>
-                    <div style={{fontSize:11,color:diff>0?'#34C98A':diff<0?'#F87171':'#6b6b85',textAlign:'center',marginTop:2,fontWeight:600}}>
+                    <div style={{fontSize:11,color:diff>0?'#3ddc97':diff<0?'#F87171':'#8b8ba6',textAlign:'center',marginTop:2,fontWeight:600}}>
                       {diff>0?`▲ +${diff}% de evolução`:`${diff===0?'→ Estável':'▼ '+diff+'% de variação'}`}
-                      <span style={{color:'#6b6b85',fontWeight:400,marginLeft:8}}>{valid.length} semanas com dados</span>
+                      <span style={{color:'#8b8ba6',fontWeight:400,marginLeft:8}}>{valid.length} semanas com dados</span>
                     </div>
                   </div>
                 );
@@ -1892,18 +1970,18 @@ export default function App(){
               <div className="card">
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                   <div className="st" style={{margin:0}}>🗓 Consistência — últimos 90 dias</div>
-                  <span style={{fontSize:11,color:'#9D95E8',fontWeight:600}}>{heatDays.filter(d=>d.hrs>0).length} dias estudados</span>
+                  <span style={{fontSize:11,color:'#a99cf6',fontWeight:600}}>{heatDays.filter(d=>d.hrs>0).length} dias estudados</span>
                 </div>
                 <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
                   {heatDays.map((d,i)=>{
                     const lv=d.hrs===0?0:d.hrs<1?1:d.hrs<2?2:d.hrs<4?3:4;
-                    const bg=['#12121a','#1c1838','#2d2060','#534AB7','#9D95E8'][lv];
-                    return<div key={i} title={`${d.date}: ${d.hrs.toFixed(1)}h`} style={{width:11,height:11,borderRadius:2,background:bg,border:d.date===t0?'1.5px solid #9D95E8':'1.5px solid transparent',cursor:'default',flexShrink:0}}/>;
+                    const bg=['#0e0e16','#1d1936','#2d2060','#6f5ff0','#a99cf6'][lv];
+                    return<div key={i} title={`${d.date}: ${d.hrs.toFixed(1)}h`} style={{width:11,height:11,borderRadius:2,background:bg,border:d.date===t0?'1.5px solid #a99cf6':'1.5px solid transparent',cursor:'default',flexShrink:0}}/>;
                   })}
                 </div>
-                <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center',fontSize:10,color:'#6b6b85'}}>
+                <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center',fontSize:10,color:'#8b8ba6'}}>
                   <span>Menos</span>
-                  {['#12121a','#1c1838','#2d2060','#534AB7','#9D95E8'].map((c,i)=><div key={i} style={{width:11,height:11,borderRadius:2,background:c}}/>)}
+                  {['#0e0e16','#1d1936','#2d2060','#6f5ff0','#a99cf6'].map((c,i)=><div key={i} style={{width:11,height:11,borderRadius:2,background:c}}/>)}
                   <span>Mais</span>
                 </div>
               </div>
@@ -1912,16 +1990,16 @@ export default function App(){
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                 <div className="card">
                   <div className="st">🔀 Interleaving esta semana</div>
-                  <div style={{fontSize:36,fontWeight:700,color:intScore>=60?'#34C98A':intScore>=40?'#FBBF24':'#F87171',lineHeight:1,marginBottom:4}}>{intScore}%</div>
-                  <div style={{fontSize:11,color:'#6b6b85',marginBottom:10}}>{thisWeekAreas.length} de {AREAS.length} áreas estudadas</div>
+                  <div style={{fontSize:36,fontWeight:700,color:intScore>=60?'#3ddc97':intScore>=40?'#FBBF24':'#F87171',lineHeight:1,marginBottom:4}}>{intScore}%</div>
+                  <div style={{fontSize:11,color:'#8b8ba6',marginBottom:10}}>{thisWeekAreas.length} de {AREAS.length} áreas estudadas</div>
                   <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
                     {AREAS.map(a=>{const active=thisWeekAreas.includes(a.id);return(
-                      <div key={a.id} style={{padding:'3px 9px',borderRadius:20,background:active?a.bg:'#12121a',border:`0.5px solid ${active?a.color:'#2a2a38'}`,fontSize:11,color:active?a.text:'#6b6b85'}}>
+                      <div key={a.id} style={{padding:'3px 9px',borderRadius:20,background:active?a.bg:'#0e0e16',border:`0.5px solid ${active?a.color:'#262635'}`,fontSize:11,color:active?a.text:'#8b8ba6'}}>
                         <i className={`ti ${a.icon}`} style={{marginRight:4,fontSize:10}}/>{a.label.split(' ')[0]}
                       </div>);
                     })}
                   </div>
-                  <div style={{fontSize:10,color:'#6b6b85',lineHeight:1.5,borderTop:`0.5px solid ${C.bord}`,paddingTop:8}}>Meta: 3+ áreas/semana para máxima retenção por interleaving</div>
+                  <div style={{fontSize:10,color:'#8b8ba6',lineHeight:1.5,borderTop:`0.5px solid ${C.bord}`,paddingTop:8}}>Meta: 3+ áreas/semana para máxima retenção por interleaving</div>
                 </div>
                 <div className="card">
                   <div className="st">⏰ Revisões no prazo por área</div>
@@ -1932,16 +2010,16 @@ export default function App(){
                       const due=chks.filter(c=>c.date&&c.date<=t0);
                       return{...a,due:due.length,onTime:due.filter(c=>c.done).length};
                     }).filter(a=>a.due>0);
-                    if(!byArea.length)return<p style={{fontSize:12,color:'#6b6b85'}}>Nenhuma revisão agendada ainda.</p>;
+                    if(!byArea.length)return<p style={{fontSize:12,color:'#8b8ba6'}}>Nenhuma revisão agendada ainda.</p>;
                     return byArea.map(a=>{
                       const pct=Math.round((a.onTime/a.due)*100);
                       return(
                         <div key={a.id} style={{marginBottom:9}}>
                           <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:3}}>
                             <span style={{color:a.text}}><i className={`ti ${a.icon}`} style={{marginRight:4}}/>{a.label.split(' ')[0]}</span>
-                            <span style={{color:pct>=80?'#34C98A':pct>=60?'#FBBF24':'#F87171',fontWeight:600}}>{pct}%</span>
+                            <span style={{color:pct>=80?'#3ddc97':pct>=60?'#FBBF24':'#F87171',fontWeight:600}}>{pct}%</span>
                           </div>
-                          <div className="pb"><div className="pf" style={{width:`${pct}%`,background:pct>=80?'#34C98A':pct>=60?'#FBBF24':'#F87171'}}/></div>
+                          <div className="pb"><div className="pf" style={{width:`${pct}%`,background:pct>=80?'#3ddc97':pct>=60?'#FBBF24':'#F87171'}}/></div>
                         </div>
                       );
                     });
@@ -1984,20 +2062,20 @@ export default function App(){
                 </div>
               )}
               <div style={{display:"flex",gap:6,marginBottom:4}}>
-                <button className={`atab${orgTab==="topics"?" on":""}`} style={orgTab==="topics"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setOrgTab("topics")}><i className="ti ti-folders" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
-                <button className={`atab${orgTab==="knowledge"?" on":""}`} style={orgTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#34C98A"}:{}} onClick={()=>setOrgTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
+                <button className={`atab${orgTab==="topics"?" on":""}`} style={orgTab==="topics"?{background:"#1d1936",color:"#a99cf6",borderColor:"#4a4193"}:{}} onClick={()=>setOrgTab("topics")}><i className="ti ti-folders" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
+                <button className={`atab${orgTab==="knowledge"?" on":""}`} style={orgTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#3ddc97"}:{}} onClick={()=>setOrgTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
               </div>
               {orgTab==="topics"&&(
                 <>
                   <div style={{position:"relative",marginBottom:4}}>
-                    <i className="ti ti-search" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#6b6b85",fontSize:14,pointerEvents:"none"}}/>
+                    <i className="ti ti-search" style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"#8b8ba6",fontSize:14,pointerEvents:"none"}}/>
                     <input
                       value={topicSearch}
                       onChange={e=>setTopicSearch(e.target.value)}
                       placeholder="Buscar tópicos por título, tags ou notas..."
-                      style={{width:"100%",paddingLeft:32,paddingRight:topicSearch?32:12,background:"#17171f",border:"0.5px solid #2a2a38",borderRadius:8,height:36,fontSize:13,color:"#e8e8f2",boxSizing:"border-box"}}
+                      style={{width:"100%",paddingLeft:32,paddingRight:topicSearch?32:12,background:"#10101a",border:"0.5px solid #262635",borderRadius:8,height:36,fontSize:13,color:"#eaeaf4",boxSizing:"border-box"}}
                     />
-                    {topicSearch&&<button onClick={()=>setTopicSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#6b6b85",cursor:"pointer",fontSize:16,padding:"0 4px"}}>×</button>}
+                    {topicSearch&&<button onClick={()=>setTopicSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#8b8ba6",cursor:"pointer",fontSize:16,padding:"0 4px"}}>×</button>}
                   </div>
                   {topicSearch.trim()&&(()=>{
                     const q=topicSearch.toLowerCase();
@@ -2010,8 +2088,8 @@ export default function App(){
                     const area=(id)=>AREAS.find(a=>a.id===id)||AREAS[4];
                     return(
                       <div>
-                        <div style={{fontSize:11,color:"#6b6b85",marginBottom:8}}>{results.length} resultado{results.length!==1?"s":""} para "{topicSearch}"</div>
-                        {results.length===0&&<div style={{textAlign:"center",padding:"24px",color:"#6b6b85",fontSize:13}}>Nenhum tópico encontrado.</div>}
+                        <div style={{fontSize:11,color:"#8b8ba6",marginBottom:8}}>{results.length} resultado{results.length!==1?"s":""} para "{topicSearch}"</div>
+                        {results.length===0&&<div style={{textAlign:"center",padding:"24px",color:"#8b8ba6",fontSize:13}}>Nenhum tópico encontrado.</div>}
                         {results.map(t=>(
                           <div key={t.id} style={{marginBottom:4}}>
                             <TopicRow t={t} area={area(t.area)}/>
@@ -2052,7 +2130,6 @@ export default function App(){
                   </div>
                 );
               })}
-                  })}
                 </>
               )}
               {orgTab==="knowledge"&&(
@@ -2070,7 +2147,7 @@ export default function App(){
                           <div style={{flex:1}}><div style={{fontWeight:500,fontSize:13,marginBottom:2}}>{k.title}</div><div style={{display:"flex",gap:5}}><span className="bdg" style={{background:a?.bg,color:a?.text}}>{a?.label}</span>{k.file_name&&<span style={{fontSize:10,color:C.muted}}>{k.file_name}</span>}</div></div>
                           <button className="btn btn-sm btnp" onClick={ev=>{ev.stopPropagation();genQuiz({...k,isKnowledge:true});}}><i className="ti ti-wand" aria-hidden/>Quiz</button>
                         </div>
-                        {exp&&<div style={{marginTop:10,fontSize:12,color:"#b0b0c8",lineHeight:1.8,whiteSpace:"pre-wrap",borderTop:`0.5px solid ${C.bord}`,paddingTop:10}}>{(k.content||"").slice(0,2000)}{(k.content||"").length>2000?"…":""}</div>}
+                        {exp&&<div style={{marginTop:10,fontSize:12,color:"#b4b4cc",lineHeight:1.8,whiteSpace:"pre-wrap",borderTop:`0.5px solid ${C.bord}`,paddingTop:10}}>{(k.content||"").slice(0,2000)}{(k.content||"").length>2000?"…":""}</div>}
                       </div>);
                     })}
                   </div>
@@ -2087,7 +2164,7 @@ export default function App(){
                 btn={{label:"+ Adicionar",icon:"ti-plus",fn:()=>setModal("rev")}}/>
               {pendentesXl.length>0&&(
                 <div className="card" style={{borderLeft:"3px solid #F87171"}}>
-                  <div className="st" style={{color:"#fca5a5"}}>⚡ Pendentes hoje ({pendentesXl.length})</div>
+                  <div className="st" style={{color:"#fca5a5"}}>Pendentes hoje ({pendentesXl.length})</div>
                   <div style={{display:"flex",flexDirection:"column",gap:6}}>
                     {pendentesXl.slice(0,8).map(r=>{
                       const cs=CAT_STYLE[r.cat]||CAT_STYLE["Geral"];
@@ -2110,7 +2187,7 @@ export default function App(){
                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                   {["Todas","Neuro","Bíblia","Inglês","Livros","Geral"].map(f=>(
                     <button key={f} className={`atab${revFilter===f?" on":""}`}
-                      style={revFilter===f?{background:CAT_STYLE[f]?.bg||"#1c1838",color:CAT_STYLE[f]?.text||"#9D95E8",borderColor:CAT_STYLE[f]?.color||"#3d3780"}:{}}
+                      style={revFilter===f?{background:CAT_STYLE[f]?.bg||"#1d1936",color:CAT_STYLE[f]?.text||"#a99cf6",borderColor:CAT_STYLE[f]?.color||"#4a4193"}:{}}
                       onClick={()=>setRevFilter(f)}>{f}</button>
                   ))}
                 </div>
@@ -2152,7 +2229,7 @@ export default function App(){
                             const done=(r.checks||[])[i]===1;const vencida=!done&&rev<=t0;
                             return(<td key={i} style={{textAlign:"center"}}>
                               <button title={rev} onClick={()=>toggleXlCheck(r.id,i)}
-                                style={{width:30,height:26,borderRadius:5,border:"none",cursor:"pointer",fontSize:12,background:done?"#0d2218":vencida?"#2d1010":"#12121a",color:done?"#34C98A":vencida?"#fca5a5":"#6b6b85"}}>
+                                style={{width:30,height:26,borderRadius:5,border:"none",cursor:"pointer",fontSize:12,background:done?"#0e2419":vencida?"#2a1216":"#0e0e16",color:done?"#3ddc97":vencida?"#fca5a5":"#8b8ba6"}}>
                                 {done?"✓":vencida?"!":"·"}
                               </button>
                             </td>);
@@ -2188,7 +2265,7 @@ export default function App(){
 
         {/* ── QUIZ ── */}
         {view==="quiz"&&(()=>{
-          if(qLoad)return<div style={{textAlign:"center",padding:"3rem",color:C.muted}}><div style={{width:32,height:32,borderRadius:"50%",border:"3px solid #9D95E8",borderTopColor:"transparent",animation:"spin 0.8s linear infinite",margin:"0 auto 12px"}}/>Gerando quiz com IA...</div>;
+          if(qLoad)return<div style={{textAlign:"center",padding:"3rem",color:C.muted}}><div style={{width:32,height:32,borderRadius:"50%",border:"3px solid #a99cf6",borderTopColor:"transparent",animation:"spin 0.8s linear infinite",margin:"0 auto 12px"}}/>Gerando quiz com IA...</div>;
           if(qErr)return<div className="card" style={{color:"#fca5a5",textAlign:"center"}}>{qErr}<br/><button className="btn" style={{marginTop:10}} onClick={()=>setQErr(null)}>Voltar</button></div>;
           if(quiz){
             if(quiz.done){
@@ -2196,19 +2273,19 @@ export default function App(){
               const topicHistory=quizResults.filter(r=>r.topicId===quiz.topicId).slice(0,8);
               return(<div style={{maxWidth:500,margin:"0 auto",display:"flex",flexDirection:"column",gap:12}}>
                 <div className="card" style={{textAlign:"center",padding:"2rem"}}>
-                  <div style={{fontSize:44,marginBottom:10}}>{pct>=80?"🎉":pct>=60?"💪":"📚"}</div>
+                  <div style={{width:64,height:64,borderRadius:"50%",margin:"0 auto 14px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,background:pct>=80?"rgba(61,220,151,0.12)":pct>=60?"rgba(251,191,36,0.12)":"rgba(111,95,240,0.12)",color:pct>=80?"#3ddc97":pct>=60?"#fbbf24":"#a99cf6"}}><i className={`ti ${pct>=80?"ti-trophy":pct>=60?"ti-flame":"ti-book"}`} aria-hidden/></div>
                   <h2 style={{fontSize:21,fontWeight:500,marginBottom:3}}>{quiz.score}/{quiz.questions.length}</h2>
                   <p style={{color:C.muted,marginBottom:10,fontSize:12}}>{pct}% — {quiz.topicTitle}</p>
-                  <div className="pb" style={{height:7,margin:"0 0 14px"}}><div className="pf" style={{width:`${pct}%`,background:pct>=80?"#34C98A":pct>=60?"#FBBF24":"#F87171"}}/></div>
+                  <div className="pb" style={{height:7,margin:"0 0 14px"}}><div className="pf" style={{width:`${pct}%`,background:pct>=80?"#3ddc97":pct>=60?"#FBBF24":"#F87171"}}/></div>
                   {/* Avaliação de confiança (Metacognição) — ajusta intervalo Ebbinghaus */}
                   {quiz.awaitConf?(
                     <div style={{marginBottom:14}}>
                       <div style={{fontSize:12,color:C.muted,marginBottom:10,fontWeight:500}}>Como foi para você? <span style={{fontSize:10,opacity:0.7}}>(ajusta seu próximo intervalo de revisão)</span></div>
                       <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
                         {[
-                          {emoji:"😊",label:"Fácil",sub:"→ +30 dias",qual:5,bg:"#0d2218",border:"#1D6B50",color:"#34C98A"},
+                          {emoji:"😊",label:"Fácil",sub:"→ +30 dias",qual:5,bg:"#0e2419",border:"#20805d",color:"#3ddc97"},
                           {emoji:"😅",label:"Difícil",sub:"→ +7 dias",qual:3,bg:"#2d2410",border:"#5a4a10",color:"#FBBF24"},
-                          {emoji:"😔",label:"Não sabia",sub:"→ reinicia",qual:1,bg:"#2d1010",border:"#7f2020",color:"#F87171"},
+                          {emoji:"😔",label:"Não sabia",sub:"→ reinicia",qual:1,bg:"#2a1216",border:"#8a2b2e",color:"#F87171"},
                         ].map(c=>(
                           <button key={c.qual} onClick={()=>{reviewTopic(quiz.topicId,c.qual);setQuiz(q=>({...q,awaitConf:false}));}}
                             style={{flex:1,minWidth:90,padding:"10px 6px",borderRadius:10,border:`1.5px solid ${c.border}`,background:c.bg,color:c.color,cursor:"pointer",fontFamily:"inherit",display:"flex",flexDirection:"column",alignItems:"center",gap:2,transition:"opacity 0.15s"}}>
@@ -2228,12 +2305,12 @@ export default function App(){
                 </div>
                 {topicHistory.length>1&&(
                   <div className="card">
-                    <div className="st">📈 Evolução neste tópico</div>
+                    <div className="st">Evolução neste tópico</div>
                     <div style={{display:"flex",alignItems:"flex-end",gap:5,height:60,marginBottom:6}}>
                       {topicHistory.slice().reverse().map((r,i)=>{const p=Math.round((r.score/r.total)*100);return(
                         <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                          <span style={{fontSize:9,color:p>=80?"#34C98A":p>=60?"#FBBF24":"#F87171",fontWeight:600}}>{p}%</span>
-                          <div style={{width:"100%",background:p>=80?"#34C98A":p>=60?"#FBBF24":"#F87171",borderRadius:"3px 3px 0 0",height:`${Math.max(6,(p/100)*44)}px`,opacity:i===topicHistory.length-1?1:0.6}}/>
+                          <span style={{fontSize:9,color:p>=80?"#3ddc97":p>=60?"#FBBF24":"#F87171",fontWeight:600}}>{p}%</span>
+                          <div style={{width:"100%",background:p>=80?"#3ddc97":p>=60?"#FBBF24":"#F87171",borderRadius:"3px 3px 0 0",height:`${Math.max(6,(p/100)*44)}px`,opacity:i===topicHistory.length-1?1:0.6}}/>
                           <span style={{fontSize:8,color:C.muted}}>{r.date.slice(5)}</span>
                         </div>);
                       })}
@@ -2251,31 +2328,31 @@ export default function App(){
                       <span style={{fontSize:11,color:C.muted}}>{(quiz.answered||[]).filter(a=>!a.correct).length} erro(s)</span>
                     </div>
                     {(quiz.answered||[]).map((a,i)=>(
-                      <div key={i} style={{background:a.correct?"#0d1a0f":"#1a0d0d",border:`0.5px solid ${a.correct?"#1D6B50":"#7f2020"}`,borderLeft:`3px solid ${a.correct?"#34C98A":"#F87171"}`,borderRadius:10,padding:"12px 14px"}}>
+                      <div key={i} style={{background:a.correct?"#0d1a0f":"#1a0d0d",border:`0.5px solid ${a.correct?"#20805d":"#8a2b2e"}`,borderLeft:`3px solid ${a.correct?"#3ddc97":"#F87171"}`,borderRadius:10,padding:"12px 14px"}}>
                         <div style={{display:"flex",gap:7,marginBottom:8,alignItems:"flex-start"}}>
-                          <span style={{fontSize:16,flexShrink:0}}>{a.correct?"✅":"❌"}</span>
+                          <i className={`ti ${a.correct?"ti-circle-check-filled":"ti-circle-x-filled"}`} style={{fontSize:18,flexShrink:0,color:a.correct?"#3ddc97":"#f87171"}} aria-hidden/>
                           <p style={{fontSize:13,fontWeight:500,color:C.text,lineHeight:1.6,margin:0}}>{a.q}</p>
                         </div>
                         <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:a.exp?10:0}}>
                           {a.opts.map((o,j)=>{
                             const isCorrect=j===a.ans;
                             const isSelected=j===a.sel;
-                            const bg=isCorrect?"#0d2218":isSelected&&!isCorrect?"#2d1010":"#12121a";
-                            const border=isCorrect?"#1D9E75":isSelected&&!isCorrect?"#7f2020":"#2a2a38";
-                            const color=isCorrect?"#34C98A":isSelected&&!isCorrect?"#F87171":"#8b8baa";
+                            const bg=isCorrect?"#0e2419":isSelected&&!isCorrect?"#2a1216":"#0e0e16";
+                            const border=isCorrect?"#27ae7a":isSelected&&!isCorrect?"#8a2b2e":"#262635";
+                            const color=isCorrect?"#3ddc97":isSelected&&!isCorrect?"#F87171":"#8b8baa";
                             return(
                               <div key={j} style={{padding:"7px 11px",borderRadius:7,background:bg,border:`0.5px solid ${border}`,fontSize:12,color,display:"flex",gap:7,alignItems:"center"}}>
                                 <span style={{flexShrink:0,fontWeight:600}}>{["A","B","C","D"][j]}.</span>
                                 <span style={{flex:1}}>{o}</span>
-                                {isCorrect&&<span style={{fontSize:11,color:"#34C98A",flexShrink:0}}>✓ correta</span>}
+                                {isCorrect&&<span style={{fontSize:11,color:"#3ddc97",flexShrink:0}}>✓ correta</span>}
                                 {isSelected&&!isCorrect&&<span style={{fontSize:11,color:"#F87171",flexShrink:0}}>✗ sua resp.</span>}
                               </div>
                             );
                           })}
                         </div>
                         {a.exp&&(
-                          <div style={{background:"#12121a",borderRadius:7,padding:"9px 12px",borderLeft:"3px solid #60A5FA"}}>
-                            <div style={{fontSize:10,color:"#60A5FA",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>💡 Justificativa</div>
+                          <div style={{background:"#0e0e16",borderRadius:7,padding:"9px 12px",borderLeft:"3px solid #60A5FA"}}>
+                            <div style={{fontSize:10,color:"#60A5FA",fontWeight:600,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Justificativa</div>
                             <p style={{fontSize:12,color:"#b0c4de",lineHeight:1.7,margin:0}}>{a.exp}</p>
                           </div>
                         )}
@@ -2290,7 +2367,7 @@ export default function App(){
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:12,fontSize:12,color:C.muted}}>
                 <span>{quiz.topicTitle}</span><span>{quiz.idx+1}/{quiz.questions.length} · {quiz.score} ✓</span>
               </div>
-              <div className="pb" style={{marginBottom:16}}><div className="pf" style={{width:`${((quiz.idx)/quiz.questions.length)*100}%`,background:"#9D95E8"}}/></div>
+              <div className="pb" style={{marginBottom:16}}><div className="pf" style={{width:`${((quiz.idx)/quiz.questions.length)*100}%`,background:"#a99cf6"}}/></div>
               <div className="card" style={{marginBottom:12}}><p style={{fontSize:14,lineHeight:1.7,fontWeight:500}}>{q.q}</p></div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {q.opts.map((o,i)=>{
@@ -2315,12 +2392,12 @@ export default function App(){
               <PageHeader title="Quiz Ativo" sub="Teste seu conhecimento com IA"/>
               {/* Banner de Interleaving */}
               {interleavingSuggestion&&interleavingSuggestion.length>=2&&(
-                <div style={{background:"linear-gradient(135deg,#1c1838 0%,#0d2218 100%)",border:"0.5px solid #3d3780",borderRadius:12,padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",flexWrap:"wrap"}}>
+                <div style={{background:"linear-gradient(135deg,#1d1936 0%,#0e2419 100%)",border:"0.5px solid #4a4193",borderRadius:12,padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:200}}>
                     <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
                       <span style={{fontSize:18}}>🔀</span>
-                      <span style={{fontWeight:600,fontSize:14,color:"#9D95E8"}}>Sessão Intercalada</span>
-                      <span style={{fontSize:10,background:"#1c1838",border:"0.5px solid #534AB7",borderRadius:20,padding:"2px 7px",color:"#9D95E8"}}>+40% retenção</span>
+                      <span style={{fontWeight:600,fontSize:14,color:"#a99cf6"}}>Sessão Intercalada</span>
+                      <span style={{fontSize:10,background:"#1d1936",border:"0.5px solid #6f5ff0",borderRadius:20,padding:"2px 7px",color:"#a99cf6"}}>+40% retenção</span>
                     </div>
                     <p style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.6}}>A <strong style={{color:"#c8c4f8"}}>prática intercalada</strong> mistura tópicos de áreas diferentes — o cérebro trabalha mais, mas a retenção aumenta 40% vs estudar uma área só.</p>
                     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -2335,8 +2412,8 @@ export default function App(){
                 </div>
               )}
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                <button className={`atab${quizAreaTab==="topics"?" on":""}`} style={quizAreaTab==="topics"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setQuizAreaTab("topics")}><i className="ti ti-books" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
-                <button className={`atab${quizAreaTab==="knowledge"?" on":""}`} style={quizAreaTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#34C98A"}:{}} onClick={()=>setQuizAreaTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
+                <button className={`atab${quizAreaTab==="topics"?" on":""}`} style={quizAreaTab==="topics"?{background:"#1d1936",color:"#a99cf6",borderColor:"#4a4193"}:{}} onClick={()=>setQuizAreaTab("topics")}><i className="ti ti-books" style={{marginRight:4}}/>Tópicos ({topics.length})</button>
+                <button className={`atab${quizAreaTab==="knowledge"?" on":""}`} style={quizAreaTab==="knowledge"?{background:"#1a3028",color:"#7ee8bc",borderColor:"#3ddc97"}:{}} onClick={()=>setQuizAreaTab("knowledge")}><i className="ti ti-file-text" style={{marginRight:4}}/>Base de Conhecimento ({knowledge.length})</button>
               </div>
 
               {quizAreaTab==="topics"&&(
@@ -2366,10 +2443,10 @@ export default function App(){
                                 <div style={{flex:1,minWidth:0}}>
                                   <div style={{fontWeight:500,fontSize:13,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div>
                                   <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                                    {lastResult&&<span className="bdg" style={{background:avgPct>=80?"#0d2218":avgPct>=60?"#2d2010":"#2d1010",color:avgPct>=80?"#34C98A":avgPct>=60?"#FBBF24":"#F87171"}}>
+                                    {lastResult&&<span className="bdg" style={{background:avgPct>=80?"#0e2419":avgPct>=60?"#2d2010":"#2a1216",color:avgPct>=80?"#3ddc97":avgPct>=60?"#FBBF24":"#F87171"}}>
                                       {tHistory.length}× · {avgPct}%
                                     </span>}
-                                    {!lastResult&&<span className="bdg" style={{background:"#17171f",color:C.muted}}>Nunca feito</span>}
+                                    {!lastResult&&<span className="bdg" style={{background:"#10101a",color:C.muted}}>Nunca feito</span>}
                                     <span style={{fontSize:10,color:C.muted}}>{(t.notes||"").slice(0,50)}…</span>
                                   </div>
                                 </div>
@@ -2425,7 +2502,7 @@ export default function App(){
                   <span style={{fontSize:12,color:C.muted}}>{bookData.author}</span>
                   <div style={{marginLeft:"auto",display:"flex",gap:6,flexWrap:"wrap"}}>
                     {["reading","queued","completed"].map(s=>(
-                      <button key={s} style={{padding:"4px 10px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,background:bookData.status===s?"#1c1838":C.dim,color:bookData.status===s?"#9D95E8":C.muted}} onClick={()=>updateBook(bookData.id,{status:s})}>{{reading:"Lendo",queued:"Na fila",completed:"Concluído"}[s]}</button>
+                      <button key={s} style={{padding:"4px 10px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,background:bookData.status===s?"#1d1936":C.dim,color:bookData.status===s?"#a99cf6":C.muted}} onClick={()=>updateBook(bookData.id,{status:s})}>{{reading:"Lendo",queued:"Na fila",completed:"Concluído"}[s]}</button>
                     ))}
                     {!isLinked
                       ?<button className="btn btn-sm btnp" onClick={()=>addBookToReview(bookData)}><i className="ti ti-calendar-plus" aria-hidden/>Revisão Espaçada</button>
@@ -2457,10 +2534,10 @@ export default function App(){
                   const vals={...ch,...(chChanges[ch.id]||{})};
                   const isRenaming=renamingCh===ch.id;
                   const isChLinked=revRows.find(r=>r.id==="ch_"+ch.id);
-                  const aColor=AREAS.find(a=>a.id===bookData.area)?.color||"#9D95E8";
+                  const aColor=AREAS.find(a=>a.id===bookData.area)?.color||"#a99cf6";
                   return(
                     <div key={ch.id} style={{border:`0.5px solid ${isExp?aColor:C.bord}`,borderRadius:10,marginBottom:6,overflow:"hidden"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"11px 14px",cursor:"pointer",background:isExp?"#12121a":C.dim}} onClick={()=>!isRenaming&&setEditCh(isExp?null:ch.id)}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"11px 14px",cursor:"pointer",background:isExp?"#0e0e16":C.dim}} onClick={()=>!isRenaming&&setEditCh(isExp?null:ch.id)}>
                         <span style={{fontSize:11,color:C.muted,fontWeight:600,flexShrink:0,minWidth:22}}>#{chIdx+1}</span>
                         <i className={`ti ${isExp?"ti-chevron-up":"ti-chevron-right"}`} style={{fontSize:12,color:C.muted,flexShrink:0}} aria-hidden/>
                         {isRenaming
@@ -2468,7 +2545,7 @@ export default function App(){
                               onKeyDown={e=>{if(e.key==="Enter"&&renameVal.trim()){renameChapter(bookData.id,ch.id,renameVal.trim());setRenamingCh(null);}if(e.key==="Escape")setRenamingCh(null);}}
                               onBlur={()=>{if(renameVal.trim())renameChapter(bookData.id,ch.id,renameVal.trim());setRenamingCh(null);}}
                               onClick={e=>e.stopPropagation()} style={{fontSize:13,padding:"3px 7px",flex:1}}/>
-                          :<span style={{fontWeight:600,fontSize:13,flex:1,color:isExp?C.text:"#b0b0c8"}}>{ch.title}</span>
+                          :<span style={{fontWeight:600,fontSize:13,flex:1,color:isExp?C.text:"#b4b4cc"}}>{ch.title}</span>
                         }
                         {isChLinked&&<span className="bdg" style={{background:"#1a2840",color:"#93c5fd",fontSize:10,flexShrink:0}}>Rev ✓</span>}
                         <div style={{display:"flex",gap:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
@@ -2479,13 +2556,13 @@ export default function App(){
                         </div>
                       </div>
                       {isExp&&(
-                        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,background:"#0f0f13"}}>
+                        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,background:"#0a0a10"}}>
                           {[
-                            {k:"resumo",l:"📋 Resumo",icon:"ti-notes",color:"#9D95E8",ph:"O que este capítulo aborda? Principais conceitos..."},
+                            {k:"resumo",l:"📋 Resumo",icon:"ti-notes",color:"#a99cf6",ph:"O que este capítulo aborda? Principais conceitos..."},
                             {k:"perguntas",l:"❓ Perguntas-chave",icon:"ti-help-circle",color:"#60A5FA",ph:"• Que problema o autor resolve?\n• Quais são as principais ideias?\n• Como isso se aplica na prática?"},
-                            {k:"insights",l:"💡 Insights & Aplicações",icon:"ti-bulb",color:"#FBBF24",ph:"• Insight 1: ...\n• Aplicação: ...\n• Conexão com outros conceitos: ..."}
+                            {k:"insights",l:"Insights & Aplicações",icon:"ti-bulb",color:"#FBBF24",ph:"• Insight 1: ...\n• Aplicação: ...\n• Conexão com outros conceitos: ..."}
                           ].map(f=>(
-                            <div key={f.k} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
+                            <div key={f.k} style={{background:"#10101a",border:`0.5px solid ${C.bord}`,borderLeft:`3px solid ${f.color}`,borderRadius:"0 8px 8px 0",padding:"10px 14px"}}>
                               <div style={{fontSize:12,color:f.color,fontWeight:600,marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
                                 <i className={`ti ${f.icon}`}/>{f.l}
                               </div>
@@ -2498,8 +2575,8 @@ export default function App(){
                                 style={{fontSize:13,resize:"vertical",lineHeight:1.8,background:"transparent",border:"none",padding:0,color:C.text,width:"100%",outline:"none",fontFamily:"inherit"}}/>
                             </div>
                           ))}
-                        <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid #2a2a38",display:"flex",gap:8}}>
-                          <button className="btn btn-sm" style={{flex:1,justifyContent:"center",display:"flex",alignItems:"center",gap:5,borderColor:"#3d3780",color:"#9D95E8"}}
+                        <div style={{marginTop:8,paddingTop:8,borderTop:"0.5px solid #262635",display:"flex",gap:8}}>
+                          <button className="btn btn-sm" style={{flex:1,justifyContent:"center",display:"flex",alignItems:"center",gap:5,borderColor:"#4a4193",color:"#a99cf6"}}
                             onClick={()=>{
                               const raw=[`# ${ch.title}`,vals.resumo||"",vals.perguntas||"",vals.insights||""].filter(Boolean).join("\n\n");
 
@@ -2511,7 +2588,7 @@ export default function App(){
                             }}>
                             <i className="ti ti-inbox"/>Enviar para Captura
                           </button>
-                          <button className="btn btn-sm" style={{flex:1,justifyContent:"center",display:"flex",alignItems:"center",gap:5,borderColor:"#1a3028",color:"#34C98A"}}
+                          <button className="btn btn-sm" style={{flex:1,justifyContent:"center",display:"flex",alignItems:"center",gap:5,borderColor:"#1a3028",color:"#3ddc97"}}
                             onClick={()=>{
                               if(!isChLinked)addChapterToReview(bookData,ch);
                               else alert("Este capítulo já está na revisão espaçada.");
@@ -2535,7 +2612,7 @@ export default function App(){
           const MONTHS_PT=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
           const curYear=new Date().getFullYear();
           const allMonthKeys=MONTHS_PT.map((m,i)=>`${curYear}-${m}`);
-          const CAT_COLORS=["#9D95E8","#34C98A","#FBBF24","#60A5FA","#F87171","#FB923C","#A78BFA"];
+          const CAT_COLORS=["#a99cf6","#3ddc97","#FBBF24","#60A5FA","#F87171","#FB923C","#A78BFA"];
           const DEFAULT_TIPS=[
             {id:"t1",title:"Crie um lugar fixo de leitura",desc:"O cérebro aprende por contexto. Uma cadeira, uma luz, um chá — sempre o mesmo. Em 2 semanas o corpo já entra em modo leitura ao sentar.",checked:false},
             {id:"t2",title:"Âncora no tempo, não na duração",desc:'Em vez de "vou ler 30 min", defina "vou ler às 21h antes de dormir". A âncora temporal é mais robusta que metas de duração.',checked:false},
@@ -2546,7 +2623,7 @@ export default function App(){
             {id:"t7",title:"Não quebre a corrente",desc:"Marque um X no Notion a cada semana que você leu — qualquer trilha, qualquer tempo. O objetivo é não ter dois X faltando seguidos. Progressão visual vicia.",checked:false},
           ];
           const planStats=readingPlan.stats||{livros:"",emAndamento:"",tempo:""};
-          const planCats=readingPlan.categories||[{name:"Neurociência",color:"#9D95E8"},{name:"Ficção",color:"#34C98A"},{name:"Espiritual",color:"#FBBF24"}];
+          const planCats=readingPlan.categories||[{name:"Neurociência",color:"#a99cf6"},{name:"Ficção",color:"#3ddc97"},{name:"Espiritual",color:"#FBBF24"}];
           const planSchedule=readingPlan.schedule||{};
           const planMeta=readingPlan.meta||"";
           const planTips=readingPlan.tips||DEFAULT_TIPS;
@@ -2569,7 +2646,7 @@ export default function App(){
               <div style={{display:"flex",gap:6}}>
                 {[{id:"acervo",icon:"ti-books",l:"Acervo"},{id:"plano",icon:"ti-calendar-month",l:"Plano de Leitura"}].map(v=>{
                   const on=booksView===v.id;
-                  return(<button key={v.id} className={`atab${on?" on":""}`} style={on?{background:"#2d1a1a",color:"#fca5a5",borderColor:"#7f2020"}:{}} onClick={()=>setBooksView(v.id)}>
+                  return(<button key={v.id} className={`atab${on?" on":""}`} style={on?{background:"#2d1a1a",color:"#fca5a5",borderColor:"#8a2b2e"}:{}} onClick={()=>setBooksView(v.id)}>
                     <i className={`ti ${v.icon}`} style={{marginRight:4}}/>{v.l}
                   </button>);
                 })}
@@ -2583,7 +2660,7 @@ export default function App(){
                       {key:"emAndamento",label:"em andamento agora",ph:"3"},
                       {key:"tempo",label:"leitura por semana",ph:"~2h"},
                     ].map(s=>(
-                      <div key={s.key} style={{background:"#17171f",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 10px",textAlign:"center"}}>
+                      <div key={s.key} style={{background:"#10101a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 10px",textAlign:"center"}}>
                         <input
                           defaultValue={planStats[s.key]||""}
                           onBlur={e=>updatePlan({stats:{...planStats,[s.key]:e.target.value}})}
@@ -2595,7 +2672,7 @@ export default function App(){
                     ))}
                   </div>
                   {/* Cronograma */}
-                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"16px"}}>
+                  <div style={{background:"#0e0e16",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"16px"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
                       <div style={{fontWeight:700,fontSize:15,color:C.text}}>Cronograma {MONTHS_PT[curMonthIdx]} — {MONTHS_PT[11]}</div>
                       <button className="btn btn-sm btnp" onClick={()=>{const name=prompt("Nome da categoria:");if(name?.trim()){const cats=[...planCats,{name:name.trim(),color:CAT_COLORS[planCats.length%CAT_COLORS.length]}];updatePlan({categories:cats});}}}><i className="ti ti-plus"/>Categoria</button>
@@ -2627,8 +2704,8 @@ export default function App(){
                             const isCur=mIdx===curMonthIdx;
                             const rowData=planSchedule[mKey]||{};
                             return(
-                              <tr key={mKey} style={{background:isCur?"#1c183844":"transparent"}}>
-                                <td style={{fontSize:12,fontWeight:700,color:isCur?"#9D95E8":C.muted,padding:"4px 4px",verticalAlign:"middle",whiteSpace:"nowrap"}}>{MONTHS_PT[mIdx]}</td>
+                              <tr key={mKey} style={{background:isCur?"#1d193644":"transparent"}}>
+                                <td style={{fontSize:12,fontWeight:700,color:isCur?"#a99cf6":C.muted,padding:"4px 4px",verticalAlign:"middle",whiteSpace:"nowrap"}}>{MONTHS_PT[mIdx]}</td>
                                 {planCats.map((cat,ci)=>{
                                   const val=rowData[cat.name]||"";
                                   const isEditing=planEditCell&&planEditCell.month===mKey&&planEditCell.cat===cat.name;
@@ -2638,7 +2715,7 @@ export default function App(){
                                         <div style={{display:"flex",gap:4,alignItems:"center"}}>
                                           <input autoFocus value={planEditCell.val} onChange={e=>setPlanEditCell(c=>({...c,val:e.target.value}))}
                                             onKeyDown={e=>{if(e.key==="Enter")saveCell();if(e.key==="Escape")setPlanEditCell(null);}}
-                                            style={{fontSize:12,padding:"4px 8px",borderRadius:20,border:`1.5px solid ${cat.color}`,background:"#17171f",color:C.text,minWidth:100,outline:"none"}}/>
+                                            style={{fontSize:12,padding:"4px 8px",borderRadius:20,border:`1.5px solid ${cat.color}`,background:"#10101a",color:C.text,minWidth:100,outline:"none"}}/>
                                           <button className="btn btn-sm btng" style={{padding:"3px 8px",fontSize:11}} onClick={saveCell}>Salvar</button>
                                           <button className="btn btn-sm" style={{padding:"3px 8px",fontSize:11}} onClick={()=>setPlanEditCell(null)}>✕</button>
                                         </div>
@@ -2664,8 +2741,8 @@ export default function App(){
                     </div>
                   </div>
                   {/* Meta */}
-                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 16px"}}>
-                    <div style={{fontSize:12,color:"#9D95E8",fontWeight:600,marginBottom:6}}>🎯 Meta anual</div>
+                  <div style={{background:"#0e0e16",border:`0.5px solid ${C.bord}`,borderRadius:12,padding:"14px 16px"}}>
+                    <div style={{fontSize:12,color:"#a99cf6",fontWeight:600,marginBottom:6}}>Meta anual</div>
                     <textarea
                       defaultValue={planMeta}
                       onBlur={e=>updatePlan({meta:e.target.value})}
@@ -2675,16 +2752,16 @@ export default function App(){
                     />
                   </div>
                   {/* Tips */}
-                  <div style={{background:"#12121a",border:`0.5px solid ${C.bord}`,borderRadius:12,overflow:"hidden"}}>
+                  <div style={{background:"#0e0e16",border:`0.5px solid ${C.bord}`,borderRadius:12,overflow:"hidden"}}>
                     <div style={{padding:"12px 16px",fontWeight:700,fontSize:14,color:C.text,borderBottom:`0.5px solid ${C.bord}`}}>Como pegar gosto pela leitura</div>
                     {planTips.map((tip,ti)=>(
                       <div key={tip.id} style={{display:"flex",gap:12,padding:"12px 16px",borderBottom:ti<planTips.length-1?`0.5px solid ${C.bord}`:"none",alignItems:"flex-start",cursor:"pointer",background:tip.checked?"#1a1830":"transparent"}}
                         onClick={()=>toggleTip(tip.id)}>
-                        <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`1.5px solid ${tip.checked?"#9D95E8":C.bord}`,background:tip.checked?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>
-                          {tip.checked&&<i className="ti ti-check" style={{fontSize:11,color:"#0f0f13"}}/>}
+                        <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`1.5px solid ${tip.checked?"#a99cf6":C.bord}`,background:tip.checked?"#a99cf6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>
+                          {tip.checked&&<i className="ti ti-check" style={{fontSize:11,color:"#0a0a10"}}/>}
                         </div>
                         <div style={{flex:1}}>
-                          <div style={{fontWeight:600,fontSize:13,color:tip.checked?"#9D95E8":C.text,textDecoration:tip.checked?"line-through":"none"}}>{tip.title}</div>
+                          <div style={{fontWeight:600,fontSize:13,color:tip.checked?"#a99cf6":C.text,textDecoration:tip.checked?"line-through":"none"}}>{tip.title}</div>
                           <div style={{fontSize:12,color:C.muted,marginTop:3,lineHeight:1.5}}>{tip.desc}</div>
                         </div>
                       </div>
@@ -2694,7 +2771,7 @@ export default function App(){
               )}
               {booksView==="acervo"&&["reading","queued","completed"].map(status=>{
                 const bks=books.filter(b=>b.status===status);if(!bks.length)return null;
-                const lbl={reading:"📖 Lendo agora",queued:"📚 Na fila",completed:"✅ Concluídos"};
+                const lbl={reading:"Lendo agora",queued:"Na fila",completed:"Concluídos"};
                 return(
                   <div key={status}>
                     <div className="st">{lbl[status]} ({bks.length})</div>
@@ -2716,7 +2793,7 @@ export default function App(){
                               <span className="bdg" style={{background:a?.bg,color:a?.text,fontSize:10}}>{a?.label}</span>
                               <div style={{display:"flex",gap:6,alignItems:"center"}}>
                                 {isLinked&&<span style={{fontSize:10,color:"#93c5fd"}}>📅 Rev.</span>}
-                                <span style={{fontSize:12,color:C.muted}}>{(b.chapters||[]).length} cap. · <span style={{color:"#9D95E8"}}>Abrir ↗</span></span>
+                                <span style={{fontSize:12,color:C.muted}}>{(b.chapters||[]).length} cap. · <span style={{color:"#a99cf6"}}>Abrir ↗</span></span>
                               </div>
                             </div>
                           </div>
@@ -2737,7 +2814,7 @@ export default function App(){
           <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
             <PageHeader title="Metas de Estudo" sub="Acompanhe seu progresso" btn={{label:"Nova meta",icon:"ti-plus",fn:()=>setModal("goal")}}/>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {PERIODS.map(p=><button key={p} className={`atab${goalPeriod===p?" on":""}`} style={goalPeriod===p?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setGoalPeriod(p)}>{p}</button>)}
+              {PERIODS.map(p=><button key={p} className={`atab${goalPeriod===p?" on":""}`} style={goalPeriod===p?{background:"#1d1936",color:"#a99cf6",borderColor:"#4a4193"}:{}} onClick={()=>setGoalPeriod(p)}>{p}</button>)}
             </div>
             <div className="g2">
               {goals.filter(g=>g.period===goalPeriod).map(g=>{
@@ -2749,7 +2826,7 @@ export default function App(){
                       <button className="btn btn-sm btnr" onClick={()=>deleteGoal(g.id)}><i className="ti ti-trash" aria-hidden/></button>
                     </div>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:C.muted,marginBottom:4}}><span>{g.done}/{g.target} {g.unit}</span><span>{pct}%</span></div>
-                    <div className="pb" style={{marginBottom:8}}><div className="pf" style={{width:`${pct}%`,background:pct>=100?"#34C98A":a?.color}}/></div>
+                    <div className="pb" style={{marginBottom:8}}><div className="pf" style={{width:`${pct}%`,background:pct>=100?"#3ddc97":a?.color}}/></div>
                     <div style={{display:"flex",gap:6}}>
                       <input type="number" min="0" value={g.done} onChange={e=>updateGoalDone(g.id,e.target.value)} style={{flex:1,fontSize:13}}/>
                       <button className="btn btn-sm btng" onClick={()=>updateGoalDone(g.id,Math.min(g.target,g.done+1))}>+1</button>
@@ -2780,7 +2857,7 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
               <PageHeader title="Planner" sub="Organização semanal e Kanban por área"/>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                <button className={`atab${plannerTab==="weekly"?" on":""}`} style={plannerTab==="weekly"?{background:"#1c1838",color:"#9D95E8",borderColor:"#3d3780"}:{}} onClick={()=>setPlannerTab("weekly")}><i className="ti ti-calendar-week" style={{marginRight:4}}/>Weekly Schedule</button>
+                <button className={`atab${plannerTab==="weekly"?" on":""}`} style={plannerTab==="weekly"?{background:"#1d1936",color:"#a99cf6",borderColor:"#4a4193"}:{}} onClick={()=>setPlannerTab("weekly")}><i className="ti ti-calendar-week" style={{marginRight:4}}/>Weekly Schedule</button>
                 {AREAS.map(a=><button key={a.id} className={`atab${plannerTab===a.id?" on":""}`} style={plannerTab===a.id?{background:a.bg,color:a.text,borderColor:a.color}:{}} onClick={()=>{setPlannerTab(a.id);setAArea(a.id);}}><i className={`ti ${a.icon}`} style={{marginRight:3,fontSize:12}}/>{a.label}</button>)}
               </div>
 
@@ -2796,20 +2873,20 @@ export default function App(){
                     const isToday=idx===activeDayIdx;
                     const done=items.filter(i=>i.done).length;
                     return(
-                      <div key={key} style={{background:isToday?"#1c1838":"#12121a",border:`0.5px solid ${isToday?"#9D95E8":C.bord}`,borderRadius:12,overflow:"hidden"}}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:isToday?"#1e1c38":"#12121a"}}>
+                      <div key={key} style={{background:isToday?"#1d1936":"#0e0e16",border:`0.5px solid ${isToday?"#a99cf6":C.bord}`,borderRadius:12,overflow:"hidden"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 16px",background:isToday?"#1e1c38":"#0e0e16"}}>
                           <div style={{display:"flex",alignItems:"center",gap:8}}>
-                            {isToday&&<span style={{fontSize:10,background:"#9D95E8",color:"#0f0f13",borderRadius:4,padding:"1px 6px",fontWeight:700}}>HOJE</span>}
-                            <span style={{fontWeight:700,fontSize:15,color:isToday?"#9D95E8":C.text}}>{day}</span>
+                            {isToday&&<span style={{fontSize:10,background:"#a99cf6",color:"#0a0a10",borderRadius:4,padding:"1px 6px",fontWeight:700}}>HOJE</span>}
+                            <span style={{fontWeight:700,fontSize:15,color:isToday?"#a99cf6":C.text}}>{day}</span>
                           </div>
-                          <span style={{fontSize:12,color:done===items.length&&items.length>0?"#34C98A":C.muted,fontWeight:600}}>{items.length>0?`${done}/${items.length} feitas`:""}</span>
+                          <span style={{fontSize:12,color:done===items.length&&items.length>0?"#3ddc97":C.muted,fontWeight:600}}>{items.length>0?`${done}/${items.length} feitas`:""}</span>
                         </div>
                         {items.length>0&&(
                           <div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:4}}>
                             {items.map(item=>(
-                              <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:item.done?"#1a1830":"#17171f",borderLeft:`3px solid ${item.done?"#9D95E8":C.bord}`,cursor:"pointer",transition:"all 0.15s"}} onClick={()=>toggleWeekItem(key,item.id)}>
-                                <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`2px solid ${item.done?"#9D95E8":C.bord}`,background:item.done?"#9D95E8":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                  {item.done&&<i className="ti ti-check" style={{fontSize:11,color:"#0f0f13"}}/>}
+                              <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,background:item.done?"#1a1830":"#10101a",borderLeft:`3px solid ${item.done?"#a99cf6":C.bord}`,cursor:"pointer",transition:"all 0.15s"}} onClick={()=>toggleWeekItem(key,item.id)}>
+                                <div style={{flexShrink:0,width:18,height:18,borderRadius:4,border:`2px solid ${item.done?"#a99cf6":C.bord}`,background:item.done?"#a99cf6":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {item.done&&<i className="ti ti-check" style={{fontSize:11,color:"#0a0a10"}}/>}
                                 </div>
                                 <span style={{flex:1,fontSize:14,lineHeight:1.5,color:item.done?C.muted:C.text,textDecoration:item.done?"line-through":"none",fontWeight:item.done?400:500,wordBreak:"break-word"}}>{item.text}</span>
                                 <button onClick={e=>{e.stopPropagation();delWeekItem(key,item.id);}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,flexShrink:0,lineHeight:1,padding:"2px 4px"}}>×</button>
@@ -2856,7 +2933,7 @@ export default function App(){
                       }
                     </div>
                   ))}
-                  <div className="pc" style={{minWidth:180,border:"1px dashed #2a2a38",background:"transparent",justifyContent:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"1rem"}}>
+                  <div className="pc" style={{minWidth:180,border:"1px dashed #262635",background:"transparent",justifyContent:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"1rem"}}>
                     {addCol
                       ?<><input autoFocus placeholder="Nome da coluna" value={colTxt} onChange={e=>setColTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPlannerCol()} style={{fontSize:13}}/>
                         <div style={{display:"flex",gap:4,width:"100%"}}>
